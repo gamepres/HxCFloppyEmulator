@@ -40,6 +40,8 @@
 
 #include "libhxcadaptor.h"
 
+#include "tracks/std_crc32.h"
+
 void gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *firstsectid,char * format,int *sectorsize)
 {
 	int i;
@@ -190,8 +192,44 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 			fprintf(xmlfile,"\t\t<pregap>%d</pregap>\n",0);
 			fprintf(xmlfile,"\t\t<rpm>%d</rpm>\n",floppy->tracks[0]->floppyRPM);
 
-			fprintf(xmlfile,"\t\t<track_list>\n");
+			// Compute crc32
+			// We need:
+			// - number of tracks
+			// - number of sides
+			// - track type: gettracktype currently hardcoded ?
+			uint32_t crc32 = 0;
+			for (int track = 0; track < floppy->floppyNumberOfTrack; track++)
+			{
+				for (int side = 0; side < floppy->floppyNumberOfSide; side++)
+				{
+					HXCFE_SECTCFG* sc = 0;
+					hxcfe_resetSearchTrackPosition(ss);
 
+					do
+					{
+						// TODO: figure out how to retrieve proper track type
+						sc = hxcfe_getNextSector(ss, track, side, ISOIBM_MFM_ENCODING);
+
+						if (sc)
+						{
+							if (sc->startdataindex != sc->startsectorindex && sc->input_data && !sc->use_alternate_data_crc)
+							{
+								crc32 = std_crc32(crc32, sc->input_data, sc->sectorsize);
+							}
+
+							free(sc);
+						}
+
+					} while (sc);
+				}
+			}
+
+			fprintf(xmlfile, "\t\t<crc32>0x%.8X</crc32>\n", crc32);
+
+			fprintf(xmlfile, "\t\t<track_list>\n");
+			
+			// Is this required since we might have moved the offsets due to crc computation ?
+			hxcfe_resetSearchTrackPosition(ss);
 
 			for(j=0;j<floppy->floppyNumberOfTrack;j++)
 			{
