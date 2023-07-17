@@ -63,6 +63,16 @@ System calls helper/wrapper library.
 
 Build folder.
 
+## Prerequisites
+### Windows development environment: WSL2 + mingw-w64
+
+Install WSL2 as per https://learn.microsoft.com/en-us/windows/wsl/install
+
+Then install mingw-w64 under WSL2
+```
+sudo apt install mingw-w64
+```
+
 ## How to build it ?
 
 #### Linux target
@@ -75,7 +85,7 @@ make
 
 #### Windows target
 
-(Linux or WSL2 + mingw32 build environment)
+(Linux or WSL2 + mingw-w64 build environment)
 
 cd build
 
