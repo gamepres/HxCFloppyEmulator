@@ -73,6 +73,8 @@ Then install mingw-w64 under WSL2
 sudo apt install mingw-w64
 ```
 
+For more instructions about the workflow, see the companion repository at https://github.com/gamepres/HxCFloppyEmulator-vs-workflow
+
 ## How to build it ?
 
 #### Linux target
