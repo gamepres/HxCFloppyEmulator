@@ -1689,6 +1689,12 @@ int32_t hxcfe_setRPM( HXCFE_FLPGEN* fb_ctx, int32_t rpm )
 	return HXCFE_NOERROR;
 }
 
+int32_t hxcfe_setDiskCRC32(HXCFE_FLPGEN* fb_ctx, uint32_t crc32)
+{
+	// TODO: properly load crc32 value
+	return HXCFE_NOERROR;
+}
+
 int32_t hxcfe_setSectorDataCRC ( HXCFE_FLPGEN* fb_ctx, uint32_t crc )
 {
 	fb_track_state * cur_track;
