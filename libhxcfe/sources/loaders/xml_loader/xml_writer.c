@@ -192,12 +192,24 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 			fprintf(xmlfile,"\t\t<pregap>%d</pregap>\n",0);
 			fprintf(xmlfile,"\t\t<rpm>%d</rpm>\n",floppy->tracks[0]->floppyRPM);
 
-			// Compute crc32
+			// Compute crc32 among other stuff
 			// We need:
 			// - number of tracks
 			// - number of sides
 			// - track type: gettracktype currently hardcoded ?
 			uint32_t crc32 = 0;
+
+			// OK for small values, we only need max 2 for number of sides (TODO: to confirm)
+			uint32_t num_sectors[floppy->floppyNumberOfSide];
+			uint32_t num_bad_sectors[floppy->floppyNumberOfSide];
+			uint32_t sectors_size[floppy->floppyNumberOfSide];
+			uint32_t num_sectors_fill_bytes_used[floppy->floppyNumberOfSide];
+
+			memset(num_sectors, 0, sizeof(uint32_t) * floppy->floppyNumberOfSide);
+			memset(num_bad_sectors, 0, sizeof(uint32_t) * floppy->floppyNumberOfSide);
+			memset(sectors_size, 0, sizeof(uint32_t) * floppy->floppyNumberOfSide);
+			memset(num_sectors_fill_bytes_used, 0, sizeof(uint32_t) * floppy->floppyNumberOfSide);
+
 			for (int track = 0; track < floppy->floppyNumberOfTrack; track++)
 			{
 				for (int side = 0; side < floppy->floppyNumberOfSide; side++)
@@ -212,9 +224,25 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 
 						if (sc)
 						{
+							// Should be same algorithm used inside countSector() and countSize()
+							num_sectors[side]++;
+							sectors_size[side] += sc->sectorsize;
+
 							if (sc->startdataindex != sc->startsectorindex && sc->input_data && !sc->use_alternate_data_crc)
 							{
 								crc32 = std_crc32(crc32, sc->input_data, sc->sectorsize);
+							}
+
+							if (sc->startdataindex != sc->startsectorindex && !sc->use_alternate_data_crc && sc->fill_byte_used)
+							{
+								num_sectors_fill_bytes_used[side]++;
+							}
+
+							// Same conditions found inside countBadSectors()
+							// TODO: Confirm this is correct
+							if (!sc->trackencoding || sc->use_alternate_data_crc || !sc->input_data)
+							{
+								num_bad_sectors[side]++;
 							}
 
 							free(sc);
@@ -224,7 +252,25 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 				}
 			}
 
+			// CRC32
 			fprintf(xmlfile, "\t\t<crc32>0x%.8X</crc32>\n", crc32);
+
+			// General sector information
+			fprintf(xmlfile, "\t\t<sector_info>\n");
+
+			for (int side = 0; side < floppy->floppyNumberOfSide; side++)
+			{
+				fprintf(xmlfile, "\t\t\t<side side_number=\"%d\">\n", side);
+
+				fprintf(xmlfile, "\t\t\t\t<number_of_sectors>%d</number_of_sectors>\n", num_sectors[side]);
+				fprintf(xmlfile, "\t\t\t\t<number_of_bad_sectors>%d</number_of_bad_sectors>\n", num_bad_sectors[side]);
+				fprintf(xmlfile, "\t\t\t\t<number_of_filled_sectors>%d</number_of_filled_sectors>\n", num_sectors_fill_bytes_used[side]);
+				fprintf(xmlfile, "\t\t\t\t<size>%d</size>\n", sectors_size[side]);
+
+				fprintf(xmlfile, "\t\t\t</side>\n");
+			}
+
+			fprintf(xmlfile, "\t\t</sector_info>\n");
 
 			fprintf(xmlfile, "\t\t<track_list>\n");
 			
