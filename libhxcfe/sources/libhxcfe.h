@@ -162,6 +162,7 @@ int                    hxcfe_setEnvVar( HXCFE* hxcfe, char * varname, char * var
 char *                 hxcfe_getEnvVar( HXCFE* hxcfe, char * varname, char * varvalue );
 char *                 hxcfe_getEnvVarIndex( HXCFE* hxcfe, int index, char * varvalue );
 int                    hxcfe_getEnvVarValue( HXCFE* hxcfe, char * varname);
+int                    hxcfe_setEnvVarValue( HXCFE* hxcfe, char * varname, int value );
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Scripts support functions                                                                      //
@@ -242,6 +243,7 @@ int32_t                hxcfe_floppySectorBySectorCopy( HXCFE* floppycontext, HXC
 #define C64_GCR                          0x15
 #define VICTOR9K_GCR                     0x16
 #define MICRALN_HS_SD                    0x17
+#define CENTURION_DD                     0x18
 
 #define DIRECT_ENCODING                  0xFE
 
@@ -442,6 +444,7 @@ int32_t                hxcfe_FDC_SCANSECTOR  ( HXCFE* floppycontext, uint8_t tra
 #define C64_GCR_ENCODING                 0x12
 #define VICTOR9K_GCR_ENCODING            0x13
 #define MICRALN_HS_FM_ENCODING           0x14
+#define CENTURION_MFM_ENCODING           0x15
 #define UNKNOWN_ENCODING                 0xFF
 
 enum {
