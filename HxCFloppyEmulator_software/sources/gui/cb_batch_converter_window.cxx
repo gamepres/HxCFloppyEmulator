@@ -126,9 +126,8 @@ ff_type ff_type_list[]=
 	{ FF_SKF,"Raw - Stream Kryoflux file format",PLUGIN_SKF,".raw"},
 	{ FF_IPF,"IPF - IPF file format (W.I.P)",PLUGIN_IPF,".ipf"},
 	{ FF_SCP,"SCP - SCP file format",PLUGIN_SCP,".scp"},
-	{ FF_BMP,"Tracks BMP - BMP file image",PLUGIN_BMP,".bmp"},
-	{ FF_STREAM_BMP,"Stream Tracks BMP - BMP file image",PLUGIN_STREAM_BMP,".bmp"},
-	{ FF_DISK_BMP,"Disk BMP - BMP file image",PLUGIN_DISK_BMP,".bmp"},
+	{ FF_BMP,"BMP - BMP file image",PLUGIN_BMP,".bmp"},
+	{ FF_DISK_BMP,"BMP - BMP file image (disk)",PLUGIN_DISK_BMP,".bmp"},
 	{ FF_XML,"XML - XML file image",PLUGIN_GENERIC_XML,".xml"},
 	{ FF_NORTHSTAR,"NSI - Northstar file image",PLUGIN_NORTHSTAR,".nsi"},
 	{ FF_HEATHKIT,"H8D - Heathkit file image",PLUGIN_HEATHKIT,".h8d"},
@@ -220,7 +219,7 @@ int draganddropconvert(HXCFE* floppycontext,char ** filelist,char * destfolder,i
 	int i,j,filenb,ret;
 	char *destinationfile,* tempstr;
 	HXCFE_FLOPPY * thefloppydisk;
-	int loaderid,keepsrcext;
+	int loaderid;
 	cfgrawfile rfc;
 	Main_Window* mw;
 	int disklayout,path_str_size;
@@ -239,8 +238,6 @@ int draganddropconvert(HXCFE* floppycontext,char ** filelist,char * destfolder,i
 	}
 
 	memset(tempstr,0,MAX_TMP_STR_SIZE);
-
-	keepsrcext = hxcfe_getEnvVarValue( floppycontext, (char*)"BATCHCONVERT_KEEP_SOURCE_FILE_NAME_EXTENSION");
 
 	thefloppydisk = 0;
 	imgldr_ctx = hxcfe_imgInitLoader( floppycontext );
@@ -363,10 +360,7 @@ int draganddropconvert(HXCFE* floppycontext,char ** filelist,char * destfolder,i
 
 					if(i)
 					{
-						if(keepsrcext)
-							destinationfile[i]='_';
-						else
-							destinationfile[i] = 0;
+						destinationfile[i]='_';
 					}
 
 					ret=1;
@@ -445,7 +439,7 @@ int browse_and_convert_directory(HXCFE* floppycontext,char * folder,char * destf
 	HXCFE_FLOPPY * thefloppydisk;
 	unsigned char * fullpath;
 	char * tempstr;
-	int loaderid,keepsrcext;
+	int loaderid;
 	Main_Window* mw;
 	int disklayout;
 	HXCFE_XMLLDR* rfb;
@@ -460,9 +454,6 @@ int browse_and_convert_directory(HXCFE* floppycontext,char * folder,char * destf
 	imgldr_ctx = hxcfe_imgInitLoader( floppycontext );
 	if(imgldr_ctx)
 	{
-
-		keepsrcext = hxcfe_getEnvVarValue( floppycontext, (char*)"BATCHCONVERT_KEEP_SOURCE_FILE_NAME_EXTENSION");
-
 		hxcfe_imgSetProgressCallback(imgldr_ctx,progress_callback_bc,(void*)guicontext);
 
 		hfindfile = hxc_find_first_file(folder,file, &FindFileData);
@@ -641,10 +632,7 @@ int browse_and_convert_directory(HXCFE* floppycontext,char * folder,char * destf
 
 								if(i)
 								{
-									if(keepsrcext)
-										destinationfile[i] = '_';
-									else
-										destinationfile[i] = 0;
+									destinationfile[i]='_';
 								}
 
 								//printf("Creating file %s\n",destinationfile);
@@ -882,12 +870,6 @@ void batch_converter_window_bt_convert(Fl_Button* bt, void*)
 	bcw=(batch_converter_window *)dw->user_data();
 	bcw->bt_convert->deactivate();
 	abort_trigger = 0;
-
-	hxcfe_setEnvVar( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_SRC_DIR", (char*)bcw->strin_src_dir->value() );
-	hxcfe_setEnvVar( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_DST_DIR", (char*)bcw->strin_dst_dir->value() );
-	hxcfe_setEnvVarValue(guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_TARGETFORMAT", bcw->choice_file_format->value() );
-	save_ui_state(guicontext->hxcfe);
-
 	hxc_createthread(guicontext->hxcfe,bcw,&convertthread,0);
 }
 
@@ -903,8 +885,6 @@ void batch_converter_window_bt_select_src(Fl_Button* bt, void*)
 	if(!select_dir((char*)"Select source",(char*)&dirstr))
 	{
 		bcw->strin_src_dir->value(dirstr);
-		hxcfe_setEnvVar( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_SRC_DIR", dirstr );
-		save_ui_state(guicontext->hxcfe);
 	}
 }
 
@@ -925,8 +905,6 @@ void batch_converter_window_bt_select_dst(Fl_Button* bt, void*)
 	if(!select_dir((char*)"Select destination",(char*)&dirstr))
 	{
 		bcw->strin_dst_dir->value(dirstr);
-		hxcfe_setEnvVar( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_DST_DIR", dirstr );
-		save_ui_state(guicontext->hxcfe);
 	}
 }
 

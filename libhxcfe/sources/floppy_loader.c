@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-FranÃ§ois DEL NERO
+// Copyright (C) 2006-2023 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : floppy_loader.c
 // Contains: Library interface functions
 //
-// Written by: Jean-FranÃ§ois DEL NERO
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -97,7 +97,6 @@ HXCFE* hxcfe_init(void)
 	HXCFE* hxcfe;
 	HXCFE_IMGLDR *imgldr_ctx;
 	image_plugin* plugin_ptr;
-	char * savefilepath;
 	int nb_loader;
 	int nb_xml_loader;
 	int i,j;
@@ -133,27 +132,12 @@ HXCFE* hxcfe_init(void)
 #if defined(WIN32)
 		hxcfe_execScriptLine( hxcfe, "set SPSCAPS_LIB_NAME CAPSImg.dll" );
 #elif __APPLE__
-		hxcfe_execScriptLine( hxcfe, "set SPSCAPS_LIB_NAME CAPSImage.framework/CAPSImage,CAPSImg.framework/CAPSImg" );
+		hxcfe_execScriptLine( hxcfe, "set SPSCAPS_LIB_NAME CAPSimage.framework/CAPSimage" );
 #else
-		hxcfe_execScriptLine( hxcfe, "set SPSCAPS_LIB_NAME libcapsimage.so.5,libcapsimage.so.5.1,libcapsimage.so" );
+		hxcfe_execScriptLine( hxcfe, "set SPSCAPS_LIB_NAME libcapsimage.so.5.1" );
 #endif
 
 		hxcfe_execScriptFile(hxcfe, "config.script");
-
-		savefilepath = hxcfe_getEnvVar( hxcfe, "UISTATE_SAVE_FILE", 0 );
-		if(savefilepath)
-		{
-			if(strlen(savefilepath))
-			{
-				hxcfe_execScriptFile(hxcfe, savefilepath);
-			}
-			else
-			{
-				hxcfe_execScriptLine( hxcfe, "set UISTATE_SAVE_FILE laststate.script" );
-				savefilepath = hxcfe_getEnvVar( hxcfe, "UISTATE_SAVE_FILE", 0 );
-				hxcfe_execScriptFile(hxcfe, savefilepath);
-			}
-		}
 
 		nb_loader = 0;
 		// Count how many static loaders we have.

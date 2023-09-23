@@ -50,7 +50,6 @@
 #endif
 
 #include <stdint.h>
-#include <string.h>
 
 #include "internal_libhxcfe.h"
 #include "libhxcfe.h"
@@ -118,7 +117,6 @@ int init_caps_lib(HXCFE* hxcfe)
 	int i;
 	HMODULE h = 0;
 	void* ret;
-	char * libnames;
 	char * libname;
 
 	i = 0;
@@ -133,41 +131,22 @@ int init_caps_lib(HXCFE* hxcfe)
 	if( !capslib_lib_funcs_def[i].name )
 		return 1;
 
-	libnames = hxcfe_getEnvVar( hxcfe, "SPSCAPS_LIB_NAME", 0 );
-	if(!libnames)
+	libname = hxcfe_getEnvVar( hxcfe, "SPSCAPS_LIB_NAME", 0 );
+	if(!libname)
 	{
-		hxcfe->hxc_printf(MSG_ERROR,"init_caps_lib : Library name not defined !");
+		hxcfe->hxc_printf(MSG_ERROR,"init_caps_lib : Library name not defined !",libname);
+
 		return 0;
 	}
 
-	libname = strtok(libnames, ",");
-	while(libname != NULL)
-	{
 #ifdef WIN32
-		h = LoadLibrary (libname);
+	h = LoadLibrary (libname);
 #else
-		h = dlopen(libname, RTLD_LAZY);
+	h = dlopen(libname, RTLD_LAZY);
 #endif
-		if(h)
-		{
-			hxcfe->hxc_printf(MSG_INFO_0,"init_caps_lib : Successfully loaded %s",libname);
-			break;
-		}
-		else
-		{
-#ifdef WIN32
-			hxcfe->hxc_printf(MSG_WARNING,"init_caps_lib : Can't load %s ! Error : %d",libname, GetLastError());
-#else
-			hxcfe->hxc_printf(MSG_WARNING,"init_caps_lib : Can't load %s",libname);
-			hxcfe->hxc_printf(MSG_WARNING,"init_caps_lib : Error: %s",dlerror());
-#endif
-		}
-		libname = strtok(NULL, ",");
-	}
-
 	if(!h)
 	{
-		hxcfe->hxc_printf(MSG_ERROR,"init_caps_lib : Failed to load CAPS library");
+		hxcfe->hxc_printf(MSG_ERROR,"init_caps_lib : Can't load %s ! Library not found ?",libname);
 		return 0;
 	}
 
@@ -175,11 +154,11 @@ int init_caps_lib(HXCFE* hxcfe)
 	i = 0;
 	while( capslib_lib_funcs_def[i].name )
 	{
-#ifdef WIN32
-		ret = (void*)GetProcAddress (h, capslib_lib_funcs_def[i].name);
-#else
-		ret = (void*)dlsym (h, capslib_lib_funcs_def[i].name);
-#endif
+		#ifdef WIN32
+			ret = (void*)GetProcAddress (h, capslib_lib_funcs_def[i].name);
+		#else
+			ret = (void*)dlsym (h, capslib_lib_funcs_def[i].name);
+		#endif
 
 		if( ret )
 			*capslib_lib_funcs_def[i].ptr = (void*)ret;

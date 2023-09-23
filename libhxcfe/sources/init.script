@@ -43,9 +43,9 @@
 
 set BMPEXPORT_STREAM_DEFAULT_XSIZE      8192
 set BMPEXPORT_STREAM_DEFAULT_YSIZE      480
-set BMPEXPORT_STREAM_DEFAULT_XTOTALTIME 1200000      # 200*1000*6 -> 200ms * 6 -> 6 revolutions
+set BMPEXPORT_STREAM_DEFAULT_XTOTALTIME 2000000      # 200*1000*10 -> 200ms * 10 -> 10 revolution
 set BMPEXPORT_STREAM_DEFAULT_YTOTALTIME 16           # 16us
-set BMPEXPORT_STREAM_BIG_DOTS           1            # Set it to be able to see
+set BMPEXPORT_STREAM_BIG_DOTS           0            # Set it to be able to see
                                                      # a single bit error.
 set BMPEXPORT_STREAM_HIGHCONTRAST       1            # Increase the contrast.
 
@@ -377,27 +377,3 @@ set PAULINE_DEFAULT_IP_ADDRESS "192.168.20.7"
 #
 
 set SECTORBYSECTORCOPY_SECTOR_ERROR_TAG -1
-
-#
-# Set this variable to 1 to keep the source file image
-# name extension when using the batch converter.
-#
-# adf to hfe converion example : myfile.adf -> myfile_adf.hfe
-#
-# Set 0 it to forget the source file extentsion :
-# adf to hfe converion example : myfile.adf -> myfile.hfe
-#
-
-set BATCHCONVERT_KEEP_SOURCE_FILE_NAME_EXTENSION 1
-
-#
-# Default User interface "last state" variables
-#
-
-set UISTATE_SAVE_FILE "laststate.script"
-
-set LASTSTATE_BATCHCONVERTER_SRC_DIR ""
-set LASTSTATE_BATCHCONVERTER_DST_DIR ""
-set LASTSTATE_BATCHCONVERTER_TARGETFORMAT 0
-
-set LASTSTATE_EXPORT_TARGETFORMAT 0

@@ -46,4 +46,3 @@ void menu_clicked(Fl_Widget * w, void * fc_ptr);
 void save_file_image(Fl_Widget * w, void * fc_ptr);
 void format_choice_cb(Fl_Widget *, void *v);
 
-void save_ui_state(HXCFE* hxcfe);
