@@ -42,9 +42,10 @@
 
 #include "tracks/std_crc32.h"
 
-void gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *firstsectid,char * format,int *sectorsize)
+int gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *firstsectid,char * format,int *sectorsize)
 {
 	int i;
+	int tracktype;
 	HXCFE_SECTCFG** sca;
 	int32_t nb_sectorfound;
 
@@ -56,6 +57,7 @@ void gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *fi
 	sca = hxcfe_getAllTrackSectors(ss,track,side,ISOIBM_MFM_ENCODING,&nb_sectorfound);
 	if(nb_sectorfound)
 	{
+		tracktype = ISOIBM_MFM_ENCODING;
 		*sectorsize = sca[0]->sectorsize;
 		*firstsectid = 0xFF;
 		*nbsect = nb_sectorfound;
@@ -73,6 +75,7 @@ void gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *fi
 	sca = hxcfe_getAllTrackSectors(ss,track,side,ISOIBM_FM_ENCODING,&nb_sectorfound);
 	if(nb_sectorfound)
 	{
+		tracktype = ISOIBM_FM_ENCODING;
 		*sectorsize = sca[0]->sectorsize;
 		*firstsectid = 0xFF;
 		*nbsect = nb_sectorfound;
@@ -86,7 +89,7 @@ void gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *fi
 		free(sca);
 	}
 
-
+	return tracktype;
 }
 
 typedef struct sect_offset_
@@ -167,7 +170,7 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 			fprintf(xmlfile,"\t\t<number_of_track>%d</number_of_track>\n",floppy->floppyNumberOfTrack);
 			fprintf(xmlfile,"\t\t<number_of_side>%d</number_of_side>\n",floppy->floppyNumberOfSide);
 
-			gettracktype(ss,0,0,&nbsect,&firstsectid,(char*)&trackformat,&sectorsize);
+			int tracktype = gettracktype(ss,0,0,&nbsect,&firstsectid,(char*)&trackformat,&sectorsize);
 
 			fprintf(xmlfile,"\t\t<format>%s</format>\n",trackformat);
 
@@ -219,8 +222,8 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 
 					do
 					{
-						// TODO: figure out how to retrieve proper track type
-						sc = hxcfe_getNextSector(ss, track, side, ISOIBM_MFM_ENCODING);
+						// TODO: confirm tracktype only 2 possible values ?
+						sc = hxcfe_getNextSector(ss, track, side, tracktype);
 
 						if (sc)
 						{
