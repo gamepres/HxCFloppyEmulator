@@ -609,6 +609,16 @@ static void XMLCALL charhandler(void *data, const char *s, int len)
 			if(!ad->xmlcheck)
 				hxcfe_setRPM (ad->fb,(unsigned short)atoi(buffer));
 		break;
+		case DISK_CRC32:
+			if (!ad->xmlcheck)
+				hxcfe_setDiskCRC32(ad->fb, (unsigned int)atoi(buffer));
+			break;
+		case NUM_SECTORS:
+		case NUM_BAD_SECTORS:
+		case NUM_FILLED_SECTORS:
+		case SIZE:
+			// TODO: do we need to serialize back ?
+			break;
 		case TRACK_LENGTH:
 			if(!ad->xmlcheck)
 				hxcfe_setRPM (ad->fb,(atoi(buffer)/10) | 0x40000000);
@@ -756,6 +766,11 @@ static void XMLCALL start(void *data, const char *el, const char **attr)
 				if(!ad->xmlcheck)
 					ad->fb = hxcfe_initFloppy(ad->floppycontext,80,2);
 			break;
+
+			case SIDE:
+				// TODO: anything we should do here ?
+				break;
+
 			case TRACK:
 				i=0;
 				side=0;

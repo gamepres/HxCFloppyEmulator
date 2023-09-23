@@ -302,6 +302,8 @@ int32_t                hxcfe_popTrack ( HXCFE_FLPGEN* fb_ctx );
 
 int32_t                hxcfe_setRPM( HXCFE_FLPGEN* fb_ctx, int32_t rpm );
 
+int32_t                hxcfe_setDiskCRC32(HXCFE_FLPGEN* fb_ctx, uint32_t crc32);
+
 int32_t                hxcfe_getCurrentNumberOfSector ( HXCFE_FLPGEN* fb_ctx );
 int32_t                hxcfe_getCurrentNumberOfSide ( HXCFE_FLPGEN* fb_ctx );
 int32_t                hxcfe_getCurrentNumberOfTrack ( HXCFE_FLPGEN* fb_ctx );
