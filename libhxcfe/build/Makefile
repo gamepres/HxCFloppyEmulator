@@ -1,7 +1,7 @@
 #CC=i386-pc-linux-gcc
-CC=gcc
-BUILD_CC=gcc
-AR=ar
+CC = gcc
+BUILD_CC = gcc
+AR = ar
 
 TARGET := $(shell uname)
 
@@ -12,11 +12,11 @@ DEBUG ?= 0
 DEBUG_ASAN ?= 0
 
 ifeq ($(DEBUG), 1)
-	CFLAGS=-O0 $(INCLUDES) -Wall -g -DDEBUG
-	LDFLAGS= -shared
+	CFLAGS = -O0 $(INCLUDES) -Wall -g -DDEBUG
+	LDFLAGS = -shared
 else
-	CFLAGS=-O3 $(INCLUDES) -Wall
-	LDFLAGS= -shared -s
+	CFLAGS = -O3 $(INCLUDES) -Wall
+	LDFLAGS = -shared -s
 endif
 
 ifeq ($(DEBUG_ASAN), 1)
@@ -26,36 +26,45 @@ endif
 
 EXEC=libhxcfe.so
 
+ifeq ($(TARGET), FreeBSD)
+	CC = cc
+	BUILD_CC = cc
+	CFLAGS += -fPIC -Wl,-Map,foo.map
+	LDFLAGS += -lc -lm  -ldl
+endif
+
 ifeq ($(TARGET), Linux)
-CFLAGS += -fPIC -Wl,-Map,foo.map
-LDFLAGS += -lc -lm  -ldl
+	CFLAGS += -fPIC -Wl,-Map,foo.map
+	LDFLAGS += -lc -lm  -ldl
 endif
 
 ifeq ($(TARGET), mingw32)
-CC=i686-w64-mingw32-gcc
-RESC=i686-w64-mingw32-windres
-LDFLAGS += -static-libgcc ../sources/win32/libhxcfe.def
-EXEC=libhxcfe.dll
+	CC = i686-w64-mingw32-gcc
+	AR = i686-w64-mingw32-ar
+	RESC = i686-w64-mingw32-windres
+	LDFLAGS += -static-libgcc ../sources/win32/libhxcfe.def
+	EXEC = libhxcfe.dll
 endif
 
 ifeq ($(TARGET), mingw64)
-CC=x86_64-w64-mingw32-gcc
-RESC=x86_64-w64-mingw32-windres
-LDFLAGS += -static-libgcc ../sources/win32/libhxcfe.def
-EXEC=libhxcfe.dll
+	CC = x86_64-w64-mingw32-gcc
+	AR = x86_64-w64-mingw32-ar
+	RESC = x86_64-w64-mingw32-windres
+	LDFLAGS += -static-libgcc ../sources/win32/libhxcfe.def
+	EXEC = libhxcfe.dll
 endif
 
 ifeq ($(findstring CYGWIN,$(shell uname)),CYGWIN)
-LDFLAGS= -shared -lc -lm  -ldl
-EXEC=libhxcfe.dll
+	LDFLAGS = -shared -lc -lm  -ldl
+	EXEC =libhxcfe.dll
 endif
 
 ifeq ($(TARGET), Darwin)
-MACOSX_ARCH ?= -arch arm64 -arch x86_64
-MACOSX_MIN_VER ?= 10.9
-CFLAGS += ${MACOSX_ARCH} -mmacosx-version-min=${MACOSX_MIN_VER}
-LDFLAGS += -lc -lm -ldl ${MACOSX_ARCH} -dynamiclib -current_version 2.0 -install_name @executable_path/../Frameworks/libhxcfe.dylib -mmacosx-version-min=${MACOSX_MIN_VER}
-EXEC=libhxcfe.dylib
+	MACOSX_ARCH ?= -arch arm64 -arch x86_64
+	MACOSX_MIN_VER ?= 10.9
+	CFLAGS += ${MACOSX_ARCH} -mmacosx-version-min=${MACOSX_MIN_VER}
+	LDFLAGS += -lc -lm -ldl ${MACOSX_ARCH} -dynamiclib -current_version 2.0 -install_name @executable_path/../Frameworks/libhxcfe.dylib -mmacosx-version-min=${MACOSX_MIN_VER}
+	EXEC = libhxcfe.dylib
 endif
 
 XML_DSKLAYOUT_INPUTS  := $(wildcard $(BASEDIR)/xml_disk/DiskLayouts/xml_files/DiskLayout_*.xml)
@@ -104,7 +113,7 @@ DISKWRITERPLUGINS = cpcdsk_writer.o mfm_writer.o hfe_writer.o raw_writer.o afi_w
 
 TRACK_FORMATS_SUPPORT = luts.o track_types_defs.o aed6200p_track.o amiga_mfm_track.o apple2_gcr_track.o arburg_track.o emu_emulator_fm_track.o c64_gcr_track.o \
 						heathkit_fm_track.o iso_ibm_fm_track.o iso_ibm_mfm_track.o membrain_mfm_track.o northstar_mfm_track.o tycom_fm_track.o dec_rx02_track.o \
-						apple_mac_gcr_track.o qd_mo5_track.o victor9k_gcr_track.o micraln_fm_track.o
+						apple_mac_gcr_track.o qd_mo5_track.o victor9k_gcr_track.o micraln_fm_track.o centurion_mfm_track.o
 
 ENCODING_SUPPORT = fm_encoding.o mfm_encoding.o dec_m2fm_encoding.o
 
@@ -209,6 +218,9 @@ emu_emulator_fm_track.o : $(BASEDIR)/tracks/track_formats/emu_emulator_fm_track.
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 c64_gcr_track.o : $(BASEDIR)/tracks/track_formats/c64_gcr_track.c $(BASEDIR)/tracks/track_formats/c64_gcr_track.h
+	$(CC) -o $@ -c $< $(CFLAGS)
+
+centurion_mfm_track.o : $(BASEDIR)/tracks/track_formats/centurion_mfm_track.c $(BASEDIR)/tracks/track_formats/centurion_mfm_track.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
 victor9k_gcr_track.o : $(BASEDIR)/tracks/track_formats/victor9k_gcr_track.c $(BASEDIR)/tracks/track_formats/victor9k_gcr_track.h

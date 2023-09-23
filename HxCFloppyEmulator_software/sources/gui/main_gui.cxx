@@ -152,6 +152,7 @@ const char * plugid_lst[]=
 	PLUGIN_IPF,
 	PLUGIN_SCP,
 	PLUGIN_BMP,
+	PLUGIN_STREAM_BMP,
 	PLUGIN_DISK_BMP,
 	PLUGIN_GENERIC_XML,
 	PLUGIN_NORTHSTAR,
@@ -169,6 +170,47 @@ void print_dbg(char * str)
 	fflush(stdout);
 }
 #endif
+
+void save_ui_state(HXCFE* hxcfe)
+{
+	char * savefilepath;
+	char * param_name;
+	char tmp_value[512];
+	int i;
+	FILE *f;
+
+	savefilepath = hxcfe_getEnvVar( hxcfe, (char*)"UISTATE_SAVE_FILE", 0 );
+	if(savefilepath)
+	{
+		if(strlen(savefilepath))
+		{
+			f = hxc_fopen(savefilepath,"wb");
+			if(f)
+			{
+				fprintf(f,"#\n# HxC Floppy Emulator user interface save file\n#\n\n");
+
+				i = 0;
+				while( hxcfe_getEnvVarIndex( hxcfe, i, NULL ) )
+				{
+					tmp_value[0] = 0;
+					param_name = hxcfe_getEnvVarIndex( hxcfe, i, (char*)&tmp_value );
+					if(param_name)
+					{
+						if( !strncmp(param_name,"LASTSTATE_", 10) )
+						{
+							fprintf(f,"set %s \"%s\"\n", param_name,tmp_value  );
+						}
+					}
+					i++;
+				}
+
+				fprintf(f,"\n");
+
+				fclose(f);
+			}
+		}
+	}
+}
 
 void menu_clicked(Fl_Widget * w, void * fc_ptr)
 {
@@ -461,7 +503,7 @@ void load_file_image(Fl_Widget * w, void * fc_ptr)
 
 void save_file_image(Fl_Widget * w, void * fc_ptr)
 {
-	int i;
+	int i,keepsrcext;
 	Fl_Native_File_Chooser fnfc;
 	unsigned char deffilename[DEFAULT_TEXT_BUFFER_SIZE + 128];
 
@@ -471,12 +513,20 @@ void save_file_image(Fl_Widget * w, void * fc_ptr)
 	}
 	else
 	{
+		keepsrcext = hxcfe_getEnvVarValue( guicontext->hxcfe, (char*)"BATCHCONVERT_KEEP_SOURCE_FILE_NAME_EXTENSION");
+
 		snprintf((char*)deffilename, sizeof(deffilename), "%s", guicontext->bufferfilename);
 
 		i=0;
 		while(deffilename[i]!=0)
 		{
-			if(deffilename[i]=='.')deffilename[i]='_';
+			if(deffilename[i]=='.')
+			{
+				if(keepsrcext)
+					deffilename[i] = '_';
+				else
+					deffilename[i] = 0;
+			}
 			i++;
 		}
 
@@ -515,8 +565,9 @@ void save_file_image(Fl_Widget * w, void * fc_ptr)
 					"KF Stream file\t*.raw\n"
 					"SPS IPF file (WIP)\t*.ipf\n"
 					"SCP file\t*.scp\n"
-					"BMP file\t*.bmp\n"
-					"BMP file (disk)\t*.bmp\n"
+					"Tracks BMP file\t*.bmp\n"
+					"Stream Tracks BMP file\t*.bmp\n"
+					"Disk BMP file\t*.bmp\n"
 					"XML file\t*.xml\n"
 					"NSI file\t*.nsi\n"
 					"H8D file\t*.h8d\n"
@@ -1290,6 +1341,10 @@ Main_Window::Main_Window()
 		batchconv_window->hlptxt->static_value("To convert a large quantity of floppy images, set the source directory and the target directory (the SDCard). Drag&Drop mode : Just set the target directory and drag&drop the floppy images on this window.");
 		batchconv_window->progress_indicator->minimum(0);
 		batchconv_window->progress_indicator->maximum(100);
+
+		batchconv_window->strin_src_dir->value( hxcfe_getEnvVar( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_SRC_DIR", NULL ) );
+		batchconv_window->strin_dst_dir->value( hxcfe_getEnvVar( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_DST_DIR", NULL ) );
+		batchconv_window->choice_file_format->value( hxcfe_getEnvVarValue( guicontext->hxcfe, (char*)"LASTSTATE_BATCHCONVERTER_TARGETFORMAT") );
 
 		#ifdef GUI_DEBUG
 		print_dbg((char*)"Main_Window : Batch converter window done !");
