@@ -45,7 +45,7 @@
 int gettracktype(HXCFE_SECTORACCESS* ss,int track,int side,int * nbsect,int *firstsectid,char * format,int *sectorsize)
 {
 	int i;
-	int tracktype;
+	int tracktype = UNKNOWN_ENCODING;
 	HXCFE_SECTCFG** sca;
 	int32_t nb_sectorfound;
 
@@ -223,32 +223,35 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 					do
 					{
 						// TODO: confirm tracktype only 2 possible values ?
-						sc = hxcfe_getNextSector(ss, track, side, tracktype);
-
-						if (sc)
+						if (tracktype == ISOIBM_MFM_ENCODING || tracktype == ISOIBM_FM_ENCODING)
 						{
-							// Should be same algorithm used inside countSector() and countSize()
-							num_sectors[side]++;
-							sectors_size[side] += sc->sectorsize;
+							sc = hxcfe_getNextSector(ss, track, side, tracktype);
 
-							if (sc->startdataindex != sc->startsectorindex && sc->input_data && !sc->use_alternate_data_crc)
+							if (sc)
 							{
-								crc32 = std_crc32(crc32, sc->input_data, sc->sectorsize);
-							}
+								// Should be same algorithm used inside countSector() and countSize()
+								num_sectors[side]++;
+								sectors_size[side] += sc->sectorsize;
 
-							if (sc->startdataindex != sc->startsectorindex && !sc->use_alternate_data_crc && sc->fill_byte_used)
-							{
-								num_sectors_fill_bytes_used[side]++;
-							}
+								if (sc->startdataindex != sc->startsectorindex && sc->input_data && !sc->use_alternate_data_crc)
+								{
+									crc32 = std_crc32(crc32, sc->input_data, sc->sectorsize);
+								}
 
-							// Same conditions found inside countBadSectors()
-							// TODO: Confirm this is correct
-							if (!sc->trackencoding || sc->use_alternate_data_crc || !sc->input_data)
-							{
-								num_bad_sectors[side]++;
-							}
+								if (sc->startdataindex != sc->startsectorindex && !sc->use_alternate_data_crc && sc->fill_byte_used)
+								{
+									num_sectors_fill_bytes_used[side]++;
+								}
 
-							free(sc);
+								// Same conditions found inside countBadSectors()
+								// TODO: Confirm this is correct
+								if (!sc->trackencoding || sc->use_alternate_data_crc || !sc->input_data)
+								{
+									num_bad_sectors[side]++;
+								}
+
+								free(sc);
+							}
 						}
 
 					} while (sc);
