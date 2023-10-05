@@ -345,6 +345,26 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 
 										fprintf(xmlfile,"</sector_data>\n");
 									}
+
+									// Per track header and data crc
+									uint32_t header_crc16 = hxcfe_getSectorConfigHCRC(NULL, sca[s]);
+									uint32_t data_crc16 = hxcfe_getSectorConfigDCRC(NULL, sca[s]);
+
+									int32_t header_crc_status = hxcfe_getSectorConfigHCRCStatus(NULL, sca[s]);
+									int32_t data_crc_status = hxcfe_getSectorConfigDCRCStatus(NULL, sca[s]);
+									
+									fprintf(xmlfile, "\t\t\t\t\t\t<header_crc16>0x%.4X</header_crc16>\n", header_crc16);
+									fprintf(xmlfile, "\t\t\t\t\t\t<data_crc16>0x%.4X</data_crc16>\n", data_crc16);
+
+									if (header_crc_status)
+										fprintf(xmlfile, "\t\t\t\t\t\t<header_crc_status>BAD</header_crc_status>\n");
+									else
+										fprintf(xmlfile, "\t\t\t\t\t\t<header_crc_status>OK</header_crc_status>\n");
+
+									if (data_crc_status)
+										fprintf(xmlfile, "\t\t\t\t\t\t<data_crc_status>BAD</data_crc_status>\n");
+									else
+										fprintf(xmlfile, "\t\t\t\t\t\t<data_crc_status>OK</data_crc_status>\n");
 								}
 
 								if(sca[s]->head != i)
