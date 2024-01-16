@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -83,11 +83,15 @@ int HxCStream_libIsValidDiskFile( HXCFE_IMGLDR * imgldr_ctx, HXCFE_IMGLDR_FILEIN
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_DEBUG,"HxCStream_libIsValidDiskFile");
 
+	filepath = NULL;
+
 	if(imgfile)
 	{
 		if( imgfile->is_dir )
 		{
 			filepath = malloc( strlen(imgfile->path) + 32 );
+			if(!filepath)
+				return HXCFE_BADFILE;
 
 			track=0;
 			side=0;
@@ -242,10 +246,14 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 	int filterpasses,filter;
 	int bmp_export;
 	envvar_entry * backup_env;
+	envvar_entry * tmp_env;
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_DEBUG,"HxCStream_libLoad_DiskFile");
 
 	backup_env = NULL;
+	f = NULL;
+	filepath = NULL;
+	folder = NULL;
 
 	if(imgfile)
 	{
@@ -255,10 +263,20 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 
 		if(!hxc_stat(imgfile,&staterep))
 		{
-			backup_env = duplicate_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+			tmp_env = initEnv( (envvar_entry *)imgldr_ctx->hxcfe->envvar, NULL );
+			if(!tmp_env)
+			{
+				return HXCFE_INTERNALERROR;
+			}
+
+			backup_env = imgldr_ctx->hxcfe->envvar;
+			imgldr_ctx->hxcfe->envvar = tmp_env;
 
 			len=hxc_getpathfolder(imgfile,0,SYS_PATH_TYPE);
-			folder=(char*)malloc(len+1);
+			folder = (char*)malloc(len+1);
+			if(!folder)
+				goto alloc_error;
+
 			hxc_getpathfolder(imgfile,folder,SYS_PATH_TYPE);
 
 			if(staterep.st_mode&S_IFDIR)
@@ -270,6 +288,10 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 				hxc_getfilenamebase(imgfile,(char*)&fname,SYS_PATH_TYPE);
 				if(!strstr(fname,".0.hxcstream") && !strstr(fname,".1.hxcstream") )
 				{
+					tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+					imgldr_ctx->hxcfe->envvar = backup_env;
+					deinitEnv( tmp_env );
+
 					free(folder);
 					return HXCFE_BADFILE;
 				}
@@ -279,6 +301,9 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 			}
 
 			filepath = malloc( strlen(imgfile) + 32 );
+			if( !filepath )
+				goto alloc_error;
+
 			sprintf(filepath,"%s%s",folder,"config.script");
 			hxcfe_execScriptFile(imgldr_ctx->hxcfe, filepath);
 
@@ -335,6 +360,7 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 						found=1;
 					}
 					hxc_fclose(f);
+					f = NULL;
 				}
 				side++;
 				if(side>1)
@@ -346,8 +372,9 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 
 			if(!found)
 			{
-				free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+				tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
 				imgldr_ctx->hxcfe->envvar = backup_env;
+				deinitEnv( tmp_env );
 
 				free( folder );
 				free( filepath );
@@ -369,8 +396,9 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 			floppydisk->floppyNumberOfSide=nbside;
 			floppydisk->floppySectorPerTrack=-1;
 
-			floppydisk->tracks=(HXCFE_CYLINDER**)malloc(sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
-			memset(floppydisk->tracks,0,sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
+			floppydisk->tracks=(HXCFE_CYLINDER**)calloc( 1, sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
+			if( !floppydisk->tracks )
+				goto alloc_error;
 
 			rpm = 300;
 
@@ -424,29 +452,48 @@ int HxCStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 
 			hxcfe_sanityCheck(imgldr_ctx->hxcfe,floppydisk);
 
-			free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+			tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
 			imgldr_ctx->hxcfe->envvar = backup_env;
+			deinitEnv( tmp_env );
 
 			return HXCFE_NOERROR;
 		}
 	}
 
 	return HXCFE_BADFILE;
+
+alloc_error:
+
+	if( f )
+		hxc_fclose(f);
+		
+	free(filepath);
+	free(folder);
+
+	if(backup_env)
+	{
+		tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+		imgldr_ctx->hxcfe->envvar = backup_env;
+		deinitEnv( tmp_env );
+	}
+
+	hxcfe_freeFloppy(imgldr_ctx->hxcfe, floppydisk );
+
+	return HXCFE_INTERNALERROR;
 }
 
 int HxCStream_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="HXCSTREAM";
 	static const char plug_desc[]="HxC Stream Loader";
 	static const char plug_ext[]="hxcstream";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	HxCStream_libIsValidDiskFile,
-		(LOADDISKFILE)		HxCStream_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,//HxCStream_libWrite_DiskFile,
-		(GETPLUGININFOS)	HxCStream_libGetPluginInfo
+		(ISVALIDDISKFILE)   HxCStream_libIsValidDiskFile,
+		(LOADDISKFILE)      HxCStream_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,//HxCStream_libWrite_DiskFile,
+		(GETPLUGININFOS)    HxCStream_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

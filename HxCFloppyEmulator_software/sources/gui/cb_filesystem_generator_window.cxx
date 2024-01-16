@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of HxCFloppyEmulator.
 //
@@ -1037,7 +1037,7 @@ int load_indexed_fileimage(int index)
 			else
 			{
 				hxcfe_floppyUnload(guicontext->hxcfe,guicontext->loadedfloppy);
-				guicontext->loadedfloppy=0;
+				guicontext->loadedfloppy = NULL;
 
 				guicontext->last_loaded_image_path[0]=0;
 				cur_index = -1;

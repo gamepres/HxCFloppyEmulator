@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : ana_loader.c
 // Contains: AnaDisk floppy image loader.
 //
-// Written by:	Jean-François DEL NERO
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -237,9 +237,24 @@ int ANA_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 			floppydisk->floppyiftype);
 
 		floppydisk->tracks=(HXCFE_CYLINDER**)malloc(sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
+		if( !floppydisk->tracks )
+		{
+			imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"Allocation error !");
+			hxc_fclose(f);
+			return HXCFE_INTERNALERROR;
+		}
+
 		memset(floppydisk->tracks,0,sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
 
-		sectorconfig=(HXCFE_SECTCFG*)malloc(sizeof(HXCFE_SECTCFG)*128);
+		sectorconfig = (HXCFE_SECTCFG*)malloc(sizeof(HXCFE_SECTCFG)*128);
+		if( !sectorconfig )
+		{
+			imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"Allocation error !");
+			hxcfe_freeFloppy( imgldr_ctx->hxcfe, floppydisk );
+			hxc_fclose(f);
+			return HXCFE_INTERNALERROR;
+		}
+
 		memset(sectorconfig,0,sizeof(HXCFE_SECTCFG)*128);
 
 		for(j=0;j<(unsigned int)(floppydisk->floppyNumberOfSide);j++)
@@ -259,9 +274,11 @@ int ANA_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 					if(sector_header.data_len)
 					{
 						sectorconfig[sectorfound].input_data = malloc(sector_header.data_len);
-						hxc_fread(sectorconfig[sectorfound].input_data,sector_header.data_len,f);
+						if(sectorconfig[sectorfound].input_data)
+						{
+							hxc_fread(sectorconfig[sectorfound].input_data,sector_header.data_len,f);
+						}
 					}
-
 
 					/*
 					// Some AnaDisk images should have the first track in FM, but nothing
@@ -320,17 +337,16 @@ int ANA_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 
 int ANA_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="ANA_IMG";
 	static const char plug_desc[]="AnaDisk file Loader";
 	static const char plug_ext[]="ana";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	ANA_libIsValidDiskFile,
-		(LOADDISKFILE)		ANA_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	ANA_libGetPluginInfo
+		(ISVALIDDISKFILE)   ANA_libIsValidDiskFile,
+		(LOADDISKFILE)      ANA_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    ANA_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -99,8 +99,6 @@ int CopyQm_libIsValidDiskFile( HXCFE_IMGLDR * imgldr_ctx, HXCFE_IMGLDR_FILEINFOS
 	return HXCFE_BADPARAMETER;
 }
 
-
-
 int CopyQm_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,char * imgfile,void * parameters)
 {
 	FILE * f_img;
@@ -156,7 +154,6 @@ int CopyQm_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,
 			hxc_fclose(f_img);
 			return HXCFE_BADFILE;
 		}
-
 
 		/* I'm guessing sector size is at 3. Expandqm thinks 7 */
 		rawcfg.sector_size = get_u16( fileheader, 0x03 );
@@ -233,7 +230,7 @@ int CopyQm_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,
 
 		/* Alloc memory for the image */
 		flatimg = malloc( image_size );
-		if ( ! flatimg )
+		if ( !flatimg )
 		{
 			imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"malloc error!");
 			hxc_fclose(f_img);
@@ -243,73 +240,78 @@ int CopyQm_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,
 		/* Start reading */
 		/* Note that it seems like each track starts a new block */
 
-			while ( curwritepos < image_size )
+		while ( curwritepos < image_size )
+		{
+			/* Read the length */
+			unsigned char lengthBuf[2];
+			res = hxc_fread( lengthBuf, 2, f_img );
+			if ( res <= 0 )
 			{
-				/* Read the length */
-				unsigned char lengthBuf[2];
-				res = hxc_fread( lengthBuf, 2, f_img );
-				if ( res <= 0 )
+				if ( feof( f_img ) )
 				{
-					if ( feof( f_img ) )
-					{
-						/* End of file - fill with f6 - do not update CRC for these */
-						memset( flatimg + curwritepos, 0xf6, image_size - curwritepos );
-						curwritepos += image_size - curwritepos;
-					}
-					else
+					/* End of file - fill with f6 - do not update CRC for these */
+					memset( flatimg + curwritepos, 0xf6, image_size - curwritepos );
+					curwritepos += image_size - curwritepos;
+				}
+				else
+				{
+					free(flatimg);
+					hxc_fclose(f_img);
+					return HXCFE_FILECORRUPTED;
+				}
+			}
+			else
+			{
+				int length = get_i16( lengthBuf, 0 );
+				if ( length < 0 )
+				{
+					/* Negative number - next byte is repeated (-length) times */
+					int c = fgetc( f_img );
+					if ( c == EOF )
 					{
 						free(flatimg);
-			            hxc_fclose(f_img);
+						hxc_fclose(f_img);                  
 						return HXCFE_FILECORRUPTED;
+					}
+					/* Copy the byte into memory and update the offset */
+					memset( flatimg + curwritepos, c, -length );
+					curwritepos -= length;
+					/* Update CRC */
+					for( ; length != 0; ++length )
+					{
+						drv_qm_update_crc( &crc, (unsigned char)c );
 					}
 				}
 				else
 				{
-					int length = get_i16( lengthBuf, 0 );
-					if ( length < 0 )
+					if ( length != 0 )
 					{
-						/* Negative number - next byte is repeated (-length) times */
-						int c = fgetc( f_img );
-						if ( c == EOF ) return HXCFE_FILECORRUPTED;
-						/* Copy the byte into memory and update the offset */
-						memset( flatimg + curwritepos, c, -length );
-						curwritepos -= length;
-						/* Update CRC */
-						for( ; length != 0; ++length )
+						/* Positive number - length different characters */
+						res = hxc_fread( flatimg + curwritepos, length, f_img );
+						/* Update CRC (and write pos) */
+						while ( length-- )
 						{
-							drv_qm_update_crc( &crc, (unsigned char)c );
+							drv_qm_update_crc( &crc, flatimg[curwritepos++] );
 						}
-					}
-					else
-					{
-						if ( length != 0 )
-						{
-							/* Positive number - length different characters */
-							res = hxc_fread( flatimg + curwritepos, length, f_img );
-							/* Update CRC (and write pos) */
-							while ( length-- )
-							{
-								drv_qm_update_crc( &crc, flatimg[curwritepos++] );
-							}
 
-							if ( res <= 0 )
-							{
-								free(flatimg);
-								hxc_fclose(f_img);
-								return HXCFE_FILECORRUPTED;
-							}
+						if ( res <= 0 )
+						{
+							free(flatimg);
+							hxc_fclose(f_img);
+							return HXCFE_FILECORRUPTED;
 						}
 					}
 				}
 			}
+		}
 
-			/* Compare the CRCs */
-			/* The CRC is zero on old images so it cannot be checked then */
-			if ( crc32 ) {
-				if ( crc32!= crc ) {
-					imgldr_ctx->hxcfe->hxc_printf(MSG_WARNING,"Copyqm loader: Bad CRC ?");
-				}
+		/* Compare the CRCs */
+		/* The CRC is zero on old images so it cannot be checked then */
+		if ( crc32 ) {
+			if ( crc32!= crc ) {
+				imgldr_ctx->hxcfe->hxc_printf(MSG_WARNING,"Copyqm loader: Bad CRC ?");
 			}
+		}
 
 		hxc_fclose(f_img);
 
@@ -321,6 +323,8 @@ int CopyQm_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,
 
 		ret = raw_iso_loader(imgldr_ctx, floppydisk, 0, flatimg, image_size, &rawcfg);
 
+		free(flatimg);
+
 		return ret;
 	}
 
@@ -330,17 +334,16 @@ int CopyQm_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,
 
 int CopyQm_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="COPYQM";
 	static const char plug_desc[]="COPYQM IMG Loader";
 	static const char plug_ext[]="dsk";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	CopyQm_libIsValidDiskFile,
-		(LOADDISKFILE)		CopyQm_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	CopyQm_libGetPluginInfo
+		(ISVALIDDISKFILE)   CopyQm_libIsValidDiskFile,
+		(LOADDISKFILE)      CopyQm_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    CopyQm_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

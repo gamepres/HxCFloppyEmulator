@@ -51,6 +51,8 @@ void hxc_destroycriticalsection( HXCFE* floppycontext, unsigned char id );
 #endif
 char * hxc_strupper( char * str );
 char * hxc_strlower( char * str );
+char * hxc_dyn_strcat(char * deststr,char * srcstr);
+char * hxc_dyn_sprintfcat(char * deststr,char * srcstr, ...);
 
 /////////////// File functions ////////////////
 
@@ -87,6 +89,16 @@ int hxc_getfilenamewext( char * fullpath, char * filenamewext, int type );
 int hxc_getpathfolder( char * fullpath, char * folder, int type );
 int hxc_checkfileext( char * path, char *ext, int type );
 int hxc_getfilesize( char * path );
+
+typedef struct HXCRAMFILE_
+{
+	uint8_t * ramfile;
+	int32_t ramfile_size;
+}HXCRAMFILE;
+
+FILE * hxc_ram_fopen(char* fn, char * mode, HXCRAMFILE * rf);
+int hxc_ram_fwrite(void * buffer,int size,int mul,FILE * file,HXCRAMFILE * rf);
+int hxc_ram_fclose(FILE *f,HXCRAMFILE * rf);
 
 /////////////// Network functions ////////////////
 

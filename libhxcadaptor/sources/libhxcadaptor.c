@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -307,20 +307,21 @@ int hxc_createthread(HXCFE* floppycontext,void* hwcontext,THREADFUNCTION thread,
 		if(!thread_handle)
 		{
 			floppycontext->hxc_printf(MSG_ERROR,"hxc_createthread : CreateThread failed -> 0x.8X", GetLastError());
+			free(threadinitptr);
+			return -2;
 		}
+
+		return 0;
 	}
 
-	return sit;
+	return -1;
 #else
 
-	unsigned long sit;
 	int ret;
 	pthread_t threadid;
 	pthread_attr_t threadattrib;
 	threadinit *threadinitptr;
 	struct sched_param param;
-
-	sit = 0;
 
 	pthread_attr_init(&threadattrib);
 
@@ -336,6 +337,7 @@ int hxc_createthread(HXCFE* floppycontext,void* hwcontext,THREADFUNCTION thread,
 		pthread_attr_setschedpolicy(&threadattrib,SCHED_OTHER);
 		param.sched_priority = sched_get_priority_max(SCHED_OTHER);
 	}
+
 	/* set the new scheduling param */
 	pthread_attr_setschedparam (&threadattrib, &param);
 
@@ -351,9 +353,14 @@ int hxc_createthread(HXCFE* floppycontext,void* hwcontext,THREADFUNCTION thread,
 		{
 			floppycontext->hxc_printf(MSG_ERROR,"hxc_createthread : pthread_create failed -> %d",ret);
 			free(threadinitptr);
+
+			return -2;
 		}
+
+		return 0;
 	}
-	return sit;
+
+	return -1;
 #endif
 
 }
@@ -406,6 +413,98 @@ char * hxc_strlower(char * str)
 	}
 
 	return str;
+}
+
+
+#ifdef WIN32
+
+#if defined(_MSC_VER) && _MSC_VER < 1900
+
+#define va_copy(dest, src) (dest = src)
+
+int vsnprintf(char *s, size_t n, const char *fmt, va_list ap)
+{
+	int ret;
+	va_list ap_copy;
+
+	if (n == 0)
+		return 0;
+
+	else if (n > INT_MAX)
+		return 0;
+
+	memset(s, 0, n);
+	va_copy(ap_copy, ap);
+	ret = _vsnprintf(s, n - 1, fmt, ap_copy);
+	va_end(ap_copy);
+
+	return ret;
+}
+
+int snprintf(char *s, size_t n, const char *fmt, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	ret = vsnprintf(s, n, fmt, ap);
+	va_end(ap);
+
+	return ret;
+}
+
+#endif
+
+#endif
+
+char * hxc_dyn_strcat(char * deststr,char * srcstr)
+{
+	char * str;
+	int size;
+
+	if(!srcstr)
+		return deststr;
+
+	size = strlen(srcstr);
+	if( !size )
+		return deststr;
+
+	if( deststr )
+	{
+		size += strlen(deststr);
+		str = realloc(deststr, size + 1);
+		if( str )
+		{
+			strcat(str, srcstr);
+		}
+	}
+	else
+	{
+		str = malloc(size + 1);
+		if( str )
+		{
+			str[0] = '\0';
+			strcat(str, srcstr);
+		}
+	}
+
+	return str;
+}
+
+char * hxc_dyn_sprintfcat(char * deststr,char * srcstr, ...)
+{
+	char tmp_str[4096];
+	va_list args;
+	va_start(args, srcstr);
+
+	if( vsnprintf(tmp_str, sizeof(tmp_str), srcstr, args) >= 0 )
+	{
+		deststr = hxc_dyn_strcat(deststr,tmp_str);
+	}
+
+	va_end(args);
+
+	return deststr;
 }
 
 char * hxc_getfilenamebase(char * fullpath,char * filenamebase, int type)
@@ -609,41 +708,41 @@ int hxc_getfilesize(char * path)
 	return filesize;
 }
 
-#ifdef WIN32
-
-#if defined(_MSC_VER) && _MSC_VER < 1900
-
-#define va_copy(dest, src) (dest = src)
-
-int vsnprintf(char *s, size_t n, const char *fmt, va_list ap)
+FILE * hxc_ram_fopen(char* fn, char * mode, HXCRAMFILE * rf)
 {
-	int ret;
-	va_list ap_copy;
+	if(!rf)
+		return NULL;
 
-	if (n == 0)
-		return 0;
-	else if (n > INT_MAX)
-		return 0;
-	memset(s, 0, n);
-	va_copy(ap_copy, ap);
-	ret = _vsnprintf(s, n - 1, fmt, ap_copy);
-	va_end(ap_copy);
+	rf->ramfile = NULL;
+	rf->ramfile_size = 0;
 
-	return ret;
+	return (FILE *)1;
+};
+
+int hxc_ram_fwrite(void * buffer,int size,int mul,FILE * file,HXCRAMFILE * rf)
+{
+	rf->ramfile = realloc(rf->ramfile,rf->ramfile_size+size);
+	if(rf->ramfile)
+	{
+		memcpy(&rf->ramfile[rf->ramfile_size],buffer,size);
+		rf->ramfile_size = rf->ramfile_size + size;
+	}
+	else
+	{
+		rf->ramfile_size = 0;
+		size = 0;
+	}
+
+	return size;
 }
 
-int snprintf(char *s, size_t n, const char *fmt, ...)
+int hxc_ram_fclose(FILE *f,HXCRAMFILE * rf)
 {
-	va_list ap;
-	int ret;
+	if(rf->ramfile)
+	{
+		free(rf->ramfile);
+		rf->ramfile = NULL;
+	}
 
-	va_start(ap, fmt);
-	ret = vsnprintf(s, n, fmt, ap);
-	va_end(ap);
-
-	return ret;
-}
-
-#endif
-
-#endif
+	return 0;
+};

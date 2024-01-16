@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : xml_disk.c
 // Contains: raw disk loader/creator
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -918,10 +918,14 @@ HXCFE_XMLLDR* hxcfe_initXmlFloppy( HXCFE* floppycontext )
 
 		rfw->xml_parser = XML_ParserCreate(NULL);
 		ad = malloc(sizeof(AppData));
-		if(!ad)
+		if(!ad || !rfw->xml_parser)
 		{
+			free(ad);
+			XML_ParserFree(rfw->xml_parser);
+			free(rfw);
 			return 0;
 		}
+
 		memset(ad,0,sizeof(AppData));
 
 		ad->interface_mode = -1;

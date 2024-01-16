@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -100,33 +100,33 @@ typedef struct sect_offset_
 
 static void exchange(sect_offset **  table, int a, int b)
 {
-    sect_offset * temp;
+	sect_offset * temp;
 	temp = table[a];
-    table[a] = table[b];
-    table[b] = temp;
+	table[a] = table[b];
+	table[b] = temp;
 }
 
 static void quickSort(sect_offset ** table, int start, int end)
 {
-    int left = start-1;
-    int right = end+1;
-    const int pivot = table[start]->ss->sector;
+	int left = start-1;
+	int right = end+1;
+	const int pivot = table[start]->ss->sector;
 
-    if(start >= end)
-        return;
+	if(start >= end)
+		return;
 
-    while(1)
-    {
-        do right--; while(table[right]->ss->sector > pivot);
-        do left++; while(table[left]->ss->sector < pivot);
+	while(1)
+	{
+		do right--; while(table[right]->ss->sector > pivot);
+		do left++; while(table[left]->ss->sector < pivot);
 
-        if(left < right)
-            exchange(table, left, right);
-        else break;
-    }
+		if(left < right)
+			exchange(table, left, right);
+		else break;
+	}
 
-    quickSort(table, start, right);
-    quickSort(table, right+1, end);
+	quickSort(table, start, right);
+	quickSort(table, right+1, end);
 }
 
 int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * filename)
@@ -140,6 +140,10 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 	HXCFE_SECTORACCESS* ss;
 	HXCFE_SECTCFG** sca;
 	sect_offset ** sorted_sectoffset,**sectoffset;
+
+	sectoffset = NULL;
+	sorted_sectoffset = NULL;
+	sca = NULL;
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"Write XML file %s...",filename);
 
@@ -293,25 +297,36 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 					gettracktype(ss,j,i,&nbsect,&firstsectid,(char*)&trackformat,&sectorsize);
 					fprintf(xmlfile,"\t\t\t\t<format>%s</format>\n",trackformat);
 
+					nb_sectorfound = 0;
+
 					sca = hxcfe_getAllTrackISOSectors(ss,j,i,&nb_sectorfound);
 					fprintf(xmlfile,"\t\t\t\t<sector_list>\n");
 
+					if(nb_sectorfound > 128 * 1024)
+						nb_sectorfound = 128 * 1024;
+
 					if(sca && nb_sectorfound)
 					{
-						sectoffset = malloc(sizeof(sect_offset*) * nb_sectorfound);
-						sorted_sectoffset = malloc(sizeof(sect_offset*) * nb_sectorfound);
+						sectoffset = calloc( 1, sizeof(sect_offset*) * (int)nb_sectorfound);
+						if( !sectoffset )
+							goto alloc_error;
+
+						sorted_sectoffset = calloc( 1, sizeof(sect_offset*) * (int)nb_sectorfound);
+						if( !sorted_sectoffset )
+							goto alloc_error;
+
 						if(sorted_sectoffset && sectoffset)
 						{
-							memset(sectoffset,0,sizeof(sect_offset*) * nb_sectorfound);
-							memset(sorted_sectoffset,0,sizeof(sect_offset*) * nb_sectorfound);
 							for(s=0;s<nb_sectorfound;s++)
 							{
 								sorted_sectoffset[s] = malloc(sizeof(sect_offset));
+								if( !sorted_sectoffset[s] )
+									goto alloc_error;
 								sorted_sectoffset[s]->ss = sca[s];
 								sorted_sectoffset[s]->offset = 0;
 							}
 
-							memcpy(sectoffset,sorted_sectoffset,sizeof(sect_offset*) * nb_sectorfound);
+							memcpy(sectoffset,sorted_sectoffset,sizeof(sect_offset*) * (int)nb_sectorfound);
 
 							quickSort(sorted_sectoffset, 0, nb_sectorfound - 1);
 
@@ -322,6 +337,7 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 							}
 
 							free(sorted_sectoffset);
+							sorted_sectoffset = NULL;
 
 							for(s=0;s<nb_sectorfound;s++)
 							{
@@ -393,9 +409,12 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 								free(sectoffset[s]);
 							}
 							free(sectoffset);
+							sectoffset = NULL;
+
 						}
 
 						free(sca);
+						sca = NULL;
 					}
 
 					fprintf(xmlfile,"\t\t\t\t</sector_list>\n");
@@ -413,5 +432,23 @@ int XML_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 		hxc_fclose(xmlfile);
 	}
 
-	return 0;
+	return HXCFE_NOERROR;
+
+alloc_error:
+	if( xmlfile )
+		hxc_fclose( xmlfile );
+
+	if(sorted_sectoffset)
+	{
+		for(s=0;s<nb_sectorfound;s++)
+		{
+			free(sorted_sectoffset[s]);
+		}
+	}
+
+	free( sectoffset );
+	free( sorted_sectoffset );
+	free( sca );
+
+	return HXCFE_INTERNALERROR;
 }

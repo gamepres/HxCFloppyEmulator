@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -54,10 +54,9 @@ int MFM_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"Write MFM file %s...",filename);
 
-	hxcmfmfile=hxc_fopen(filename,"wb");
+	hxcmfmfile = hxc_fopen(filename,"wb");
 	if(hxcmfmfile)
 	{
-
 		sprintf((char*)&mfmheader.headername,"HXCMFM");
 		mfmheader.number_of_track=floppy->floppyNumberOfTrack;
 		mfmheader.number_of_side=floppy->floppyNumberOfSide;
@@ -79,7 +78,12 @@ int MFM_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 
 		imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"%d Tracks, %d side(s)",mfmheader.number_of_track,mfmheader.number_of_side);
 
-		offsettrack=(int32_t*) malloc(((mfmheader.number_of_track*mfmheader.number_of_side)+1)*sizeof(int32_t));
+		offsettrack = (int32_t*) malloc(((mfmheader.number_of_track*mfmheader.number_of_side)+1)*sizeof(int32_t));
+		if( !offsettrack )
+		{
+			hxc_fclose(hxcmfmfile);
+			return HXCFE_INTERNALERROR;
+		}
 
 		i=0;
 		trackpos=sizeof(mfmheader)+(sizeof(mfmtrackdesc)*(mfmheader.number_of_track*mfmheader.number_of_side));
@@ -112,13 +116,12 @@ int MFM_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 				}
 
 				fwrite(&mfmtrackdesc,sizeof(mfmtrackdesc),1,hxcmfmfile);
-
 			}
 
 			i++;
 		}while(i<(mfmheader.number_of_track));
 
-		mfmtrack=NULL;
+		mfmtrack = NULL;
 		i=0;
 		do
 		{
@@ -133,7 +136,13 @@ int MFM_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 				else
 					mfmsize=mfmsize/8;
 
-				mfmtrack=(unsigned char*) malloc(mfmsize);
+				mfmtrack = (unsigned char*) malloc(mfmsize);
+				if( !mfmtrack )
+				{
+					free( offsettrack );
+					hxc_fclose(hxcmfmfile);
+					return HXCFE_INTERNALERROR;
+				}
 
 				if(ftell(hxcmfmfile)<offsettrack[(i*mfmheader.number_of_side)+j])
 				{
@@ -146,24 +155,23 @@ int MFM_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 				fwrite(mfmtrack,mfmsize,1,hxcmfmfile);
 
 				free(mfmtrack);
-
+				mfmtrack = NULL;
 			}
 
 			i++;
 		}while(i<(mfmheader.number_of_track));
 
 		free(offsettrack);
+		offsettrack = NULL;
 
 		hxc_fclose(hxcmfmfile);
 
-		return 0;
+		return HXCFE_NOERROR;
 	}
 	else
 	{
 		imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"Cannot create %s!",filename);
 
-		return -1;
+		return HXCFE_ACCESSERROR;
 	}
-
-
 }

@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -77,7 +77,7 @@ int get_next_FM_Heathkit_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SE
 	unsigned char tmp_buffer[8 + 256 + 1]; // Sync + Data + Checksum
 	unsigned char checksum;
 	int sector_extractor_sm;
-	unsigned char *tmp_sector;
+	unsigned char tmp_sector[3+1+256+1];
 
 	memset(sector,0,sizeof(HXCFE_SECTCFG));
 
@@ -107,15 +107,16 @@ int get_next_FM_Heathkit_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SE
 				else
 				{
 					// Search next index
-					while( !track->indexbuffer[ bit_offset / 8 ] )
+					while( bit_offset < track->tracklen && !track->indexbuffer[ bit_offset / 8 ] )
 					{
 						bit_offset++;
-						if( bit_offset >= track->tracklen )
-						{
-							sector_extractor_sm=ENDOFTRACK;
-							bit_offset = -1;
-							break;
-						}
+					}
+
+					if( bit_offset >= track->tracklen )
+					{
+						sector_extractor_sm=ENDOFTRACK;
+						bit_offset = -1;
+						break;
 					}
 				}
 
@@ -209,8 +210,7 @@ int get_next_FM_Heathkit_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SE
 					bit_offset = searchBitStream(track->databuffer,track->tracklen,(88+16)*8,fm_buffer,4*8*4,bit_offset);
 					if((bit_offset!=-1))
 					{
-						tmp_sector=(unsigned char*)malloc(3+1+sector->sectorsize+1);
-						memset(tmp_sector,0,3+1+sector->sectorsize+1);
+						memset(tmp_sector, 0, sizeof(tmp_sector));
 
 						sector->startdataindex = (bit_offset + (3*8*4)) % track->tracklen;
 						sector->endsectorindex = fmtobin(track->databuffer,NULL,track->tracklen,tmp_sector,3+1+sector->sectorsize+1,bit_offset,0);
@@ -241,12 +241,14 @@ int get_next_FM_Heathkit_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SE
 								sector->use_alternate_data_crc = 0xFF;
 							}
 
-							sector->input_data=(unsigned char*)malloc(sector->sectorsize);
-							for(i=0;i<256;i++)
+							sector->input_data = (unsigned char*)malloc(sector->sectorsize);
+							if( sector->input_data )
 							{
-								sector->input_data[i] = LUT_ByteBitsInverter[ tmp_sector[ 3 +  1 + i] ];
+								for(i=0;i<256;i++)
+								{
+									sector->input_data[i] = LUT_ByteBitsInverter[ tmp_sector[ 3 +  1 + i] ];
+								}
 							}
-							free(tmp_sector);
 
 							// "Empty" sector detection
 							checkEmptySector(sector);
@@ -259,14 +261,14 @@ int get_next_FM_Heathkit_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SE
 							sector->endsectorindex = tmp_bit_offset;
 						}
 
-						sector_extractor_sm=ENDOFSECTOR;
+						sector_extractor_sm = ENDOFSECTOR;
 					}
 					else
 					{
 						sector->startdataindex = tmp_bit_offset;
 						sector->endsectorindex = tmp_bit_offset;
 
-						sector_extractor_sm=ENDOFSECTOR;
+						sector_extractor_sm = ENDOFSECTOR;
 					}
 
 					sector_extractor_sm = ENDOFSECTOR;

@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -161,7 +161,7 @@ int BMP_Disk_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppydis
 					bdata.nb_color = 16;
 					bdata.xsize = td->xsize;
 					bdata.ysize = td->ysize;
-					bdata.data = (uint32_t*)ptr;
+					bdata.data = (void*)ptr;
 					bdata.palette = 0;
 
 					bmp16b_write(filename,&bdata);
@@ -171,7 +171,7 @@ int BMP_Disk_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppydis
 					bdata.nb_color = 8;
 					bdata.xsize = td->xsize;
 					bdata.ysize = td->ysize;
-					bdata.data = (uint32_t*)ptrchar;
+					bdata.data = (void*)ptrchar;
 					bdata.palette = (unsigned char*)&pal;
 
 					bmpRLE8b_write(filename,&bdata);

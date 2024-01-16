@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : streamhfe_loader.c
 // Contains: HFE floppy image loader
 //
-// Written by:	Jean-François DEL NERO
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -339,6 +339,7 @@ int STREAMHFE_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 	int filterpasses,filter;
 	int bmp_export;
 	envvar_entry * backup_env;
+	envvar_entry * tmp_env;
 
 	backup_env = NULL;
 
@@ -355,7 +356,12 @@ int STREAMHFE_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 
 	if(!strncmp((char*)header.signature,"HxC_Stream_Image",16))
 	{
-		backup_env = duplicate_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+		tmp_env = initEnv( (envvar_entry *)imgldr_ctx->hxcfe->envvar, NULL );
+		if(!tmp_env)
+			goto error;
+
+		backup_env = imgldr_ctx->hxcfe->envvar;
+		imgldr_ctx->hxcfe->envvar = tmp_env;
 
 		floppydisk->floppyNumberOfTrack = header.number_of_track;
 		floppydisk->floppyNumberOfSide = header.number_of_side;
@@ -376,8 +382,7 @@ int STREAMHFE_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 			free(filepath);
 		}
 
-		if(folder)
-			free(folder);
+		free(folder);
 
 		phasecorrection = hxcfe_getEnvVarValue( imgldr_ctx->hxcfe, "FLUXSTREAM_PLL_PHASE_CORRECTION_DIVISOR" );
 		filterpasses = hxcfe_getEnvVarValue( imgldr_ctx->hxcfe, "FLUXSTREAM_BITRATE_FILTER_PASSES" );
@@ -486,8 +491,9 @@ int STREAMHFE_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 
 		hxcfe_sanityCheck(imgldr_ctx->hxcfe,floppydisk);
 
-		free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+		tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
 		imgldr_ctx->hxcfe->envvar = backup_env;
+		deinitEnv( tmp_env );
 
 		return HXCFE_NOERROR;
 	}
@@ -499,8 +505,12 @@ int STREAMHFE_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydi
 error:
 	hxc_fclose(f);
 
-	free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
-	imgldr_ctx->hxcfe->envvar = backup_env;
+	if( backup_env )
+	{
+		tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+		imgldr_ctx->hxcfe->envvar = backup_env;
+		deinitEnv( tmp_env );
+	}
 
 	return HXCFE_INTERNALERROR;
 }
@@ -509,17 +519,16 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 
 int STREAMHFE_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="HXC_STREAMHFE";
 	static const char plug_desc[]="Stream HFE file Loader";
 	static const char plug_ext[]="hfe";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	STREAMHFE_libIsValidDiskFile,
-		(LOADDISKFILE)		STREAMHFE_libLoad_DiskFile,
-		(WRITEDISKFILE)		STREAMHFE_libWrite_DiskFile,
-		(GETPLUGININFOS)	STREAMHFE_libGetPluginInfo
+		(ISVALIDDISKFILE)   STREAMHFE_libIsValidDiskFile,
+		(LOADDISKFILE)      STREAMHFE_libLoad_DiskFile,
+		(WRITEDISKFILE)     STREAMHFE_libWrite_DiskFile,
+		(GETPLUGININFOS)    STREAMHFE_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(
