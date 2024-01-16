@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -191,6 +191,7 @@ typedef struct _HXCFE_FXSA
 
 	int     weak_cell_threshold;
 
+	int32_t sector_recovery;
 }HXCFE_FXSA;
 
 #define _HXCFE_FXSA_

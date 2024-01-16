@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -37,7 +37,6 @@
 
 #include "bmp_file.h"
 
-
 int bmp_load(char * file,bitmap_data * bdata)
 {
 	FILE * f;
@@ -50,6 +49,12 @@ int bmp_load(char * file,bitmap_data * bdata)
 	BITMAPFILEHEADER bitmap_header;
 	BITMAPINFOHEADER bitmap_info_header;
 	RGBQUAD * palette;
+	uint32_t * data_ptr;
+
+	data_ptr = NULL;
+	linebuffer = NULL;
+	palette = NULL;
+	f = NULL;
 
 	f = hxc_fopen(file,"rb");
 	if(f)
@@ -93,7 +98,10 @@ int bmp_load(char * file,bitmap_data * bdata)
 				palette=0;
 				if(palettesize)
 				{
-					palette=(RGBQUAD *) malloc(palettesize*sizeof(RGBQUAD));
+					palette = (RGBQUAD *)malloc(palettesize*sizeof(RGBQUAD));
+					if(!palette)
+						goto error;
+
 					memset(palette,0,palettesize*sizeof(RGBQUAD));
 
 					fseek(f,sizeof(BITMAPFILEHEADER)+ bitmap_info_header.biSize ,SEEK_SET);
@@ -105,7 +113,10 @@ int bmp_load(char * file,bitmap_data * bdata)
 
 				bdata->xsize = xsize;
 				bdata->ysize = ysize;
-				bdata->data = (uint32_t *)malloc(xsize*ysize*sizeof(uint32_t));
+				bdata->data = (void *)malloc(xsize*ysize*sizeof(uint32_t));
+				if( !bdata->data )
+					goto error;
+
 				memset(bdata->data,0,xsize*ysize*sizeof(uint32_t));
 
 				switch(bitperpixel)
@@ -117,23 +128,28 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize = (xsize/8 + (xsize&7));
 
 						linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
+						if( !linebuffer )
+							goto error;
+
+						data_ptr = (uint32_t*)bdata->data;
 
 						for(i = 0; i < ysize; i++ )
 						{
-
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
 							hxc_fread(linebuffer,bitmapdatalinesize,f);
 
 							for(j=0;j<xsize;j++)
 							{
-								bdata->data[(xsize*((ysize-1)-i))+j]=palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbRed |
-																	 palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbGreen<<8 |
-																	 palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbBlue<<16;
+								data_ptr[(xsize*((ysize-1)-i))+j] = palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbRed |
+																	palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbGreen<<8 |
+																	palette[(linebuffer[(j/8)]>>(7-(j&7)))&0x1].rgbBlue<<16;
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 						free(palette);
+						palette = NULL;
 					break;
 
 					case 4:
@@ -142,7 +158,11 @@ int bmp_load(char * file,bitmap_data * bdata)
 						else
 							bitmapdatalinesize = (xsize/2 + (xsize&1));
 
-						linebuffer=(unsigned char *) malloc(bitmapdatalinesize);
+						linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
+						if( !linebuffer )
+							goto error;
+
+						data_ptr = (uint32_t*)bdata->data;
 
 						for(i=0;i<ysize;i++)
 						{
@@ -151,14 +171,16 @@ int bmp_load(char * file,bitmap_data * bdata)
 
 							for(j=0;j<xsize;j++)
 							{
-								bdata->data[(xsize*((ysize-1)-i))+j]=palette[(linebuffer[(j/2)]>>(4*((~j)&1)))&0xF].rgbRed |
-																	 palette[(linebuffer[(j/2)]>>(4*((~j)&1)))&0xF].rgbGreen<<8 |
-																	 palette[(linebuffer[(j/2)]>>(4*((~j)&1)))&0xF].rgbBlue<<16;
+								data_ptr[(xsize*((ysize-1)-i))+j] = palette[(linebuffer[(j/2)]>>(4*((~j)&1)))&0xF].rgbRed |
+																	palette[(linebuffer[(j/2)]>>(4*((~j)&1)))&0xF].rgbGreen<<8 |
+																	palette[(linebuffer[(j/2)]>>(4*((~j)&1)))&0xF].rgbBlue<<16;
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 						free(palette);
+						palette = NULL;
 					break;
 
 					case 8:
@@ -168,6 +190,10 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize = xsize;
 
 						linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
+						if( !linebuffer )
+							goto error;
+
+						data_ptr = (uint32_t*)bdata->data;
 
 						for(i=0;i<ysize;i++)
 						{
@@ -176,15 +202,16 @@ int bmp_load(char * file,bitmap_data * bdata)
 
 							for(j=0;j<xsize;j++)
 							{
-								bdata->data[(xsize*((ysize-1)-i))+j]=palette[linebuffer[j]].rgbRed |
-														 palette[linebuffer[j]].rgbGreen<<8 |
-														 palette[linebuffer[j]].rgbBlue<<16;
-
+								data_ptr[(xsize*((ysize-1)-i))+j] = palette[linebuffer[j]].rgbRed |
+																	palette[linebuffer[j]].rgbGreen<<8 |
+																	palette[linebuffer[j]].rgbBlue<<16;
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 						free(palette);
+						palette = NULL;
 					break;
 
 					case 24:
@@ -194,6 +221,10 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize=(xsize*3);
 
 						linebuffer=(unsigned char *)malloc(bitmapdatalinesize);
+						if( !linebuffer )
+							goto error;
+
+						data_ptr = (uint32_t*)bdata->data;
 
 						for(i=0;i<ysize;i++)
 						{
@@ -202,13 +233,14 @@ int bmp_load(char * file,bitmap_data * bdata)
 
 							for(j=0;j<xsize;j++)
 							{
-								bdata->data[(xsize*((ysize-1)-i))+j]=linebuffer[j*3+2] |
-																	 linebuffer[j*3+1]<<8 |
-																	 linebuffer[j*3+0]<<16;
+								data_ptr[(xsize*((ysize-1)-i))+j] = linebuffer[j*3+2] |
+																	linebuffer[j*3+1]<<8 |
+																	linebuffer[j*3+0]<<16;
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 					break;
 
 					case 32:
@@ -218,23 +250,26 @@ int bmp_load(char * file,bitmap_data * bdata)
 							bitmapdatalinesize=(xsize*4);
 
 						linebuffer=(unsigned char *)malloc(bitmapdatalinesize);
+						if( !linebuffer )
+							goto error;
+
+						data_ptr = (uint32_t*)bdata->data;
 
 						for(i=0;i<ysize;i++)
 						{
-
 							fseek(f,bitmapdataoffset + (bitmapdatalinesize*i) ,SEEK_SET);
 							hxc_fread(linebuffer,bitmapdatalinesize,f);
 
 							for(j=0;j<xsize;j++)
 							{
-								bdata->data[(xsize*((ysize-1)-i))+j]=linebuffer[j*4+2] |
-																	 linebuffer[j*4+1]<<8 |
-																	 linebuffer[j*4+0]<<16;
-
+								data_ptr[(xsize*((ysize-1)-i))+j] = linebuffer[j*4+2] |
+																	linebuffer[j*4+1]<<8 |
+																	linebuffer[j*4+0]<<16;
 							}
 						}
 
 						free(linebuffer);
+						linebuffer = NULL;
 
 					break;
 
@@ -263,6 +298,17 @@ int bmp_load(char * file,bitmap_data * bdata)
 
 	//file error
 	return -3;
+
+error:
+
+	free( data_ptr );
+	free( linebuffer );
+	free( palette );
+
+	if( f )
+		fclose( f );
+
+	return -3;
 }
 
 int bmp24b_write(char * file,bitmap_data * bdata)
@@ -288,7 +334,7 @@ int bmp24b_write(char * file,bitmap_data * bdata)
 			bitmapdatalinesize = ((bitmapdatalinesize & (~0x3)) + 0x4);
 
 		bitmap_header.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + (bitmapdatalinesize*bdata->ysize);
-		fwrite(&bitmap_header,1,sizeof(BITMAPFILEHEADER),f);
+		fwrite(&bitmap_header,sizeof(BITMAPFILEHEADER),1,f);
 
 		memset(&bitmap_info_header,0,sizeof(BITMAPINFOHEADER));
 		bitmap_info_header.biSize = sizeof(BITMAPINFOHEADER);
@@ -298,24 +344,30 @@ int bmp24b_write(char * file,bitmap_data * bdata)
 		bitmap_info_header.biPlanes = 1;
 		bitmap_info_header.biSizeImage = bitmapdatalinesize*bdata->ysize;
 
-		fwrite(&bitmap_info_header,1,sizeof(BITMAPINFOHEADER),f);
+		fwrite(&bitmap_info_header,sizeof(BITMAPINFOHEADER),1,f);
 
 		linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
-		memset(linebuffer,0,bitmapdatalinesize);
-
-		for(i=0;i<bdata->ysize;i++)
+		if( linebuffer )
 		{
-			for(j=0;j<bdata->xsize;j++)
+			memset(linebuffer,0,bitmapdatalinesize);
+
+			uint32_t * data_ptr = (uint32_t*)bdata->data;
+
+			for(i=0;i<bdata->ysize;i++)
 			{
-				linebuffer[(j*3)+2] = (unsigned char)( (bdata->data[((((bdata->ysize-1)-i))*bdata->xsize) + j]) & 0xFF);
-				linebuffer[(j*3)+1] = (unsigned char)( (bdata->data[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>8) & 0xFF);
-				linebuffer[(j*3)+0] = (unsigned char)( (bdata->data[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>16) & 0xFF);
+				for(j=0;j<bdata->xsize;j++)
+				{
+					linebuffer[(j*3)+2] = (unsigned char)( (data_ptr[((((bdata->ysize-1)-i))*bdata->xsize) + j]) & 0xFF);
+					linebuffer[(j*3)+1] = (unsigned char)( (data_ptr[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>8) & 0xFF);
+					linebuffer[(j*3)+0] = (unsigned char)( (data_ptr[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>16) & 0xFF);
+				}
+
+				fwrite(linebuffer,bitmapdatalinesize,1,f);
 			}
 
-			fwrite(linebuffer,1,bitmapdatalinesize,f);
+			free(linebuffer);
+			linebuffer = NULL;
 		}
-
-		free(linebuffer);
 		hxc_fclose(f);
 	}
 
@@ -346,7 +398,7 @@ int bmp16b_write(char * file,bitmap_data * bdata)
 			bitmapdatalinesize = ((bitmapdatalinesize & (~0x3)) + 0x4);
 
 		bitmap_header.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + (bitmapdatalinesize*bdata->ysize);
-		fwrite(&bitmap_header,1,sizeof(BITMAPFILEHEADER),f);
+		fwrite(&bitmap_header,sizeof(BITMAPFILEHEADER),1,f);
 
 		memset(&bitmap_info_header,0,sizeof(BITMAPINFOHEADER));
 		bitmap_info_header.biSize = sizeof(BITMAPINFOHEADER);
@@ -356,34 +408,38 @@ int bmp16b_write(char * file,bitmap_data * bdata)
 		bitmap_info_header.biPlanes = 1;
 		bitmap_info_header.biSizeImage = bitmapdatalinesize*bdata->ysize;
 
-		fwrite(&bitmap_info_header,1,sizeof(BITMAPINFOHEADER),f);
+		fwrite(&bitmap_info_header,sizeof(BITMAPINFOHEADER),1,f);
 
 		linebuffer = (unsigned char *)malloc(bitmapdatalinesize);
-		memset(linebuffer,0,bitmapdatalinesize);
-
-		for(i=0;i<bdata->ysize;i++)
+		if( linebuffer )
 		{
-			for(j=0;j<bdata->xsize;j++)
+			memset(linebuffer,0,bitmapdatalinesize);
+
+			uint32_t * data_ptr = (uint32_t*)bdata->data;
+
+			for(i=0;i<bdata->ysize;i++)
 			{
+				for(j=0;j<bdata->xsize;j++)
+				{
+					color = (unsigned short)( (data_ptr[((((bdata->ysize-1)-i))*bdata->xsize) + j]) & 0xFF)>>3;
+					color = (color<<5) | (unsigned short)( (data_ptr[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>8) & 0xFF)>>3;
+					color = (color<<5) | (unsigned short)( (data_ptr[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>16) & 0xFF)>>3;
 
-				color = (unsigned short)( (bdata->data[((((bdata->ysize-1)-i))*bdata->xsize) + j]) & 0xFF)>>3;
-				color = (color<<5) | (unsigned short)( (bdata->data[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>8) & 0xFF)>>3;
-				color = (color<<5) | (unsigned short)( (bdata->data[((((bdata->ysize-1)-i))*bdata->xsize) + j]>>16) & 0xFF)>>3;
+					linebuffer[(j*2)+0] = color & 0xFF;
+					linebuffer[(j*2)+1] = (color>>8) & 0xFF;
+				}
 
-				linebuffer[(j*2)+0] =  color & 0xFF;
-				linebuffer[(j*2)+1] =  (color>>8) & 0xFF;
+				fwrite(linebuffer,bitmapdatalinesize,1,f);
 			}
 
-			fwrite(linebuffer,1,bitmapdatalinesize,f);
+			free(linebuffer);
+			linebuffer = NULL;
 		}
-
-		free(linebuffer);
 		hxc_fclose(f);
 	}
 
 	return 0;
 }
-
 
 int packlineRLE(unsigned char * src,int size,unsigned char * dst)
 {
@@ -435,7 +491,6 @@ int bmpRLE8b_write(char * file,bitmap_data * bdata)
 	unsigned char * src_data;
 	unsigned char pal[256*4];
 
-
 	f = hxc_fopen(file,"wb");
 	if(f)
 	{
@@ -450,7 +505,7 @@ int bmpRLE8b_write(char * file,bitmap_data * bdata)
 			bitmapdatalinesize = ((bitmapdatalinesize & (~0x3)) + 0x4);
 
 		bitmap_header.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(pal) + (bitmapdatalinesize*bdata->ysize);
-		fwrite(&bitmap_header,1,sizeof(BITMAPFILEHEADER),f);
+		fwrite(&bitmap_header,sizeof(BITMAPFILEHEADER),1,f);
 
 		memset(&bitmap_info_header,0,sizeof(BITMAPINFOHEADER));
 		bitmap_info_header.biSize = sizeof(BITMAPINFOHEADER);
@@ -461,7 +516,7 @@ int bmpRLE8b_write(char * file,bitmap_data * bdata)
 		bitmap_info_header.biCompression = 1;
 		bitmap_info_header.biSizeImage = bitmapdatalinesize*bdata->ysize;
 
-		fwrite(&bitmap_info_header,1,sizeof(BITMAPINFOHEADER),f);
+		fwrite(&bitmap_info_header,sizeof(BITMAPINFOHEADER),1,f);
 
 		memset(pal,0,sizeof(pal));
 		for(i=0;i<256;i++)
@@ -470,39 +525,46 @@ int bmpRLE8b_write(char * file,bitmap_data * bdata)
 			pal[(i*4) + 1] = (bdata->palette[(i*4) + 1]);
 			pal[(i*4) + 2] = (bdata->palette[(i*4) + 0]);
 		}
+
 		fwrite(pal,sizeof(pal),1,f);
 
-		linebuffer = (unsigned char *)malloc((bitmapdatalinesize*2) + (bdata->ysize*2));
-		memset(linebuffer,0,(bitmapdatalinesize*2) + (bdata->ysize*2));
-
 		datasize = 0;
-		src_data = (unsigned char*)bdata->data;
-		for(i=0;i<bdata->ysize;i++)
-		{
-			lnsize = packlineRLE(&src_data[((bdata->ysize-1)-i)*bdata->xsize],bdata->xsize,linebuffer);
 
-			if( i == (bdata->ysize - 1) )
+		linebuffer = (unsigned char *)malloc((bitmapdatalinesize*2) + (bdata->ysize*2));
+		if( linebuffer )
+		{
+			memset(linebuffer,0,(bitmapdatalinesize*2) + (bdata->ysize*2));
+
+			src_data = (unsigned char*)bdata->data;
+			for(i=0;i<bdata->ysize;i++)
 			{
-				if(lnsize)
+				lnsize = packlineRLE(&src_data[((bdata->ysize-1)-i)*bdata->xsize],bdata->xsize,linebuffer);
+
+				if( i == (bdata->ysize - 1) )
 				{
-					linebuffer[lnsize-1] = 0x01; // End of BMP
+					if(lnsize)
+					{
+						linebuffer[lnsize-1] = 0x01; // End of BMP
+					}
 				}
+
+				fwrite(linebuffer,lnsize,1,f);
+
+				datasize = datasize + lnsize;
 			}
 
-			fwrite(linebuffer,1,lnsize,f);
-
-			datasize = datasize + lnsize;
+			free(linebuffer);
+			linebuffer = NULL;
 		}
 
 		bitmap_header.bfSize = sizeof(BITMAPFILEHEADER) + sizeof(BITMAPINFOHEADER) + sizeof(pal) + datasize;
 		fseek(f,0,SEEK_SET);
-		fwrite(&bitmap_header,1,sizeof(BITMAPFILEHEADER),f);
+		fwrite(&bitmap_header,sizeof(BITMAPFILEHEADER),1,f);
 
 		bitmap_info_header.biSizeImage = datasize;
 		fseek(f,sizeof(BITMAPFILEHEADER),SEEK_SET);
-		fwrite(&bitmap_info_header,1,sizeof(BITMAPINFOHEADER),f);
+		fwrite(&bitmap_info_header,sizeof(BITMAPINFOHEADER),1,f);
 
-		free(linebuffer);
 		hxc_fclose(f);
 	}
 

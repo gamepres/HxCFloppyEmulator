@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -329,7 +329,9 @@ int STX_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * 
 		}
 
 		fclose(stxdskfile);
+
+		return HXCFE_NOERROR;
 	}
 
-	return 0;
+	return HXCFE_ACCESSERROR;
 }

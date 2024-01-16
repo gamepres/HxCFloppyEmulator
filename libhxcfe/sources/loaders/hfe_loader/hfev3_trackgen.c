@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : hfev3_trackgen.c
 // Contains: HFE V3 track generator
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -144,12 +144,9 @@ int32_t GenOpcodesTrack(HXCFE* floppycontext,uint8_t * index_h0,uint8_t * datah0
 
 	if(!finalbuffer_H0 || !finalbuffer_H1 || !randomfinalbuffer_H0)
 	{
-		if(finalbuffer_H0)
-			free(finalbuffer_H0);
-		if(finalbuffer_H1)
-			free(finalbuffer_H1);
-		if(randomfinalbuffer_H0)
-			free(randomfinalbuffer_H0);
+		free(finalbuffer_H0);
+		free(finalbuffer_H1);
+		free(randomfinalbuffer_H0);
 
 		return 0;
 	}
@@ -296,7 +293,7 @@ int32_t GenOpcodesTrack(HXCFE* floppycontext,uint8_t * index_h0,uint8_t * datah0
 		numberofpart=((trackzonebuffer_0[i].end-trackzonebuffer_0[i].start)/BITRATEBLOCKSIZE)+1;
 
 
-		if(numberofpart)
+		if(numberofpart > 0)
 		{
 			for(j=0;j<(uint32_t)numberofpart;j++)
 			{
@@ -330,7 +327,7 @@ int32_t GenOpcodesTrack(HXCFE* floppycontext,uint8_t * index_h0,uint8_t * datah0
 	{
 		numberofpart=((trackzonebuffer_1[i].end-trackzonebuffer_1[i].start)/BITRATEBLOCKSIZE)+1;
 
-		if(numberofpart)
+		if(numberofpart > 0)
 		{
 			for(j=0;j<(uint32_t)numberofpart;j++)
 			{

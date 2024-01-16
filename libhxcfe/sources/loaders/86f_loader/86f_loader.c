@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -343,15 +343,13 @@ error:
 	if(f)
 		hxc_fclose(f);
 
-	if(track_buffer)
-		free(track_buffer);
+	free(track_buffer);
 
 	return ret;
 }
 
 int F86_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="PC_86F";
 	static const char plug_desc[]="86Box 86F Loader";
 	static const char plug_ext[]="86f";

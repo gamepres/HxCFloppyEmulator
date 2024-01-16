@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -87,7 +87,7 @@ typedef struct sockaddr SOCKADDR;
 #include "libhxcfe.h"
 #include "libhxcadaptor.h"
 
-void * network_connect(char * address,unsigned short port)
+void * network_connect(char * address, unsigned short port)
 {
 	hxc_tcp_stat * tcp_stat;
 #ifdef WIN32
@@ -124,10 +124,14 @@ void * network_connect(char * address,unsigned short port)
 
 		if (connect(tcp_stat->m_socket, (SOCKADDR*)&tcp_stat->clientService, sizeof(tcp_stat->clientService)) == SOCKET_ERROR)
 		{
+			closesocket(tcp_stat->m_socket);
+
 #ifdef WIN32
 			WSACleanup();
 #endif
+
 			free(tcp_stat);
+
 			return (void*)NULL;
 		}
 
@@ -137,7 +141,7 @@ void * network_connect(char * address,unsigned short port)
 	return (void*)NULL;
 }
 
-int network_read(void * network_connection, unsigned char * buffer, int size,int timeout)
+int network_read(void * network_connection, unsigned char * buffer, int size, int timeout)
 {
 	int bytesRecv;
 	int offset;
@@ -163,7 +167,7 @@ int network_read(void * network_connection, unsigned char * buffer, int size,int
 	return size;
 }
 
-int network_read2(void * network_connection, unsigned char * buffer, int size,int timeout)
+int network_read2(void * network_connection, unsigned char * buffer, int size, int timeout)
 {
 	int bytesRecv;
 	int offset;
@@ -173,12 +177,12 @@ int network_read2(void * network_connection, unsigned char * buffer, int size,in
 
 	offset=0;
 
-		bytesRecv = recv(tcp_stat->m_socket, (char*)&buffer[offset], size - offset, 0);
+	bytesRecv = recv(tcp_stat->m_socket, (char*)&buffer[offset], size - offset, 0);
 
 	return bytesRecv;
 }
 
-int network_write(void * network_connection, unsigned char * buffer, int size,int timeout)
+int network_write(void * network_connection, unsigned char * buffer, int size, int timeout)
 {
 	int bytesSent;
 	int offset;

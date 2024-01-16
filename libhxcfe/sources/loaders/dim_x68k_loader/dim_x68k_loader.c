@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -186,7 +186,7 @@ int DIM_x68k_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydis
 		if( header.sectors_present[i] == 0x01 )
 		{
 			fseek( f_img , 0x100 + (i * trk_raw_size), SEEK_SET);
-			fread( &dsk_raw_buf[i * trk_raw_size], trk_raw_size, 1, f_img);
+			hxc_fread( &dsk_raw_buf[i * trk_raw_size], trk_raw_size, f_img);
 		}
 	}
 
@@ -201,7 +201,6 @@ int DIM_x68k_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydis
 
 int DIM_x68k_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="X68000_DIM";
 	static const char plug_desc[]="X68000 DIM file loader";
 	static const char plug_ext[]="dim";

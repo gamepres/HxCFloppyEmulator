@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : KryoFluxStream_loader.c
 // Contains: KryoFlux Stream floppy image loader
 //
-// Written by: DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +243,7 @@ int KryoFluxStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flo
 	int bmp_export;
 	int mac_clv,c64_clv,victor9k_clv;
 	envvar_entry * backup_env;
+	envvar_entry * tmp_env;
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_DEBUG,"KryoFluxStream_libLoad_DiskFile");
 
@@ -254,9 +255,12 @@ int KryoFluxStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flo
 	{
 		if(!hxc_stat(imgfile,&staterep))
 		{
-			backup_env = duplicate_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
-			if(!backup_env)
+			tmp_env = initEnv( (envvar_entry *)imgldr_ctx->hxcfe->envvar, NULL );
+			if(!tmp_env)
 				goto error;
+
+			backup_env = imgldr_ctx->hxcfe->envvar;
+			imgldr_ctx->hxcfe->envvar = tmp_env;
 
 			len = hxc_getpathfolder(imgfile,0,SYS_PATH_TYPE);
 
@@ -275,6 +279,10 @@ int KryoFluxStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flo
 				hxc_getfilenamebase(imgfile,(char*)&fname,SYS_PATH_TYPE);
 				if(!strstr(fname,".0.raw") && !strstr(fname,".1.raw") )
 				{
+					tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+					imgldr_ctx->hxcfe->envvar = backup_env;
+					deinitEnv( tmp_env );
+
 					free(folder);
 					return HXCFE_BADFILE;
 				}
@@ -353,8 +361,9 @@ int KryoFluxStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flo
 
 			if(!found)
 			{
-				free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+				tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
 				imgldr_ctx->hxcfe->envvar = backup_env;
+				deinitEnv( tmp_env );
 
 				free( folder );
 				free( filepath );
@@ -434,8 +443,9 @@ int KryoFluxStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flo
 
 			hxcfe_sanityCheck(imgldr_ctx->hxcfe,floppydisk);
 
-			free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+			tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
 			imgldr_ctx->hxcfe->envvar = backup_env;
+			deinitEnv( tmp_env );
 
 			return HXCFE_NOERROR;
 		}
@@ -444,28 +454,31 @@ int KryoFluxStream_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flo
 	return HXCFE_BADFILE;
 
 error:
-	if(folder)
-		free(folder);
+	free(folder);
+	free(filepath);
 
-	if(filepath)
-		free(filepath);
+	if( backup_env )
+	{
+		tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+		imgldr_ctx->hxcfe->envvar = backup_env;
+		deinitEnv( tmp_env );
+	}
 
 	return HXCFE_INTERNALERROR;
 }
 
 int KryoFluxStream_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="KRYOFLUXSTREAM";
 	static const char plug_desc[]="KryoFlux Stream Loader";
 	static const char plug_ext[]="raw";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	KryoFluxStream_libIsValidDiskFile,
-		(LOADDISKFILE)		KryoFluxStream_libLoad_DiskFile,
-		(WRITEDISKFILE)		KryoFluxStream_libWrite_DiskFile,
-		(GETPLUGININFOS)	KryoFluxStream_libGetPluginInfo
+		(ISVALIDDISKFILE)   KryoFluxStream_libIsValidDiskFile,
+		(LOADDISKFILE)      KryoFluxStream_libLoad_DiskFile,
+		(WRITEDISKFILE)     KryoFluxStream_libWrite_DiskFile,
+		(GETPLUGININFOS)    KryoFluxStream_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

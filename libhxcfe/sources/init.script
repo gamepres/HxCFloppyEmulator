@@ -109,6 +109,13 @@ set FLUXSTREAM_SKIPBLOCKSDETECTION 0
 set FLUXSTREAM_OVERLAPSEARCHDEPTH 0.015
 
 #
+# Try to recover/fix bad sectors with copies present in others revolutions.
+#
+
+set FLUXSTREAM_SECTORS_RECOVERY 1                    # 1 - Try to recover bad sectors with from others revolutions.
+                                                     # 0 - Disabled (old behavior).
+
+#
 # Experimental :
 # Ignore the index and threat all the stream as one revolution.
 #
@@ -153,7 +160,7 @@ set FLUXSTREAM_PLL_MIN_MAX_PERCENT 18                # Min-Max PLL deviation in 
 
 set FLUXSTREAM_PLL_MAX_ERROR_NS    680               # Max PLL error trigger level (in nS).
                                                      # If the error is above this level, the corresponding
-													 # bit is marked as "flakey"
+                                                     # bit is marked as "flakey"
 
 # PLL correction ratio ("Fast" -> Used when getting closer to the central frequency)
 
@@ -165,8 +172,8 @@ set FLUXSTREAM_PLL_FAST_CORRECTION_RATIO_D 16
 set FLUXSTREAM_PLL_SLOW_CORRECTION_RATIO_N 31
 set FLUXSTREAM_PLL_SLOW_CORRECTION_RATIO_D 32
 
-set FLUXSTREAM_ANALYSIS_WINDOW_SIZE_US 1000          # Analysis window size in uS
-set FLUXSTREAM_ANALYSIS_REV2REV_MAX_PULSES_JITTER 10 # Max pulses duration jitter in percent
+set FLUXSTREAM_ANALYSIS_WINDOW_SIZE_US 1020          # Analysis window size in uS
+set FLUXSTREAM_ANALYSIS_REV2REV_MAX_PULSES_JITTER 14 # Max pulses duration jitter in percent
 
 #
 # Output bitrate filter settings
@@ -197,8 +204,8 @@ set FLUXSTREAM_ANALYSIS_USE_VICTOR_TIMING 0
 # Stream files (SCP/Kryoflux...) export mode
 #
 
-set FLUXSTREAM_STREAM_TO_STREAM_CONVERT 1         # 1 - Stream to stream support enabled.
-                                                  # 0 - Stream to stream support disabled (old behavior).
+set FLUXSTREAM_STREAM_TO_STREAM_CONVERT 1            # 1 - Stream to stream support enabled.
+                                                     # 0 - Stream to stream support disabled (old behavior).
 
 #
 # ---- Specific raw format parameters ----
@@ -257,6 +264,12 @@ set A2RLOADER_SINGLE_SIDE 0                          # Skip the side 1.
 set A2RLOADER_BITRATE 0                              # Force the bitrate. (no auto-detection)
 set A2RLOADER_BMPEXPORT 0                            # Export/plot the inputs stream tracks to BMP images.
 set A2RLOADER_SKIP_INTER_TRACKS 1                    # Skip inter tracks. Just process the normal tracks.
+
+#
+# WOZ loader parameters
+#
+
+set WOZLOADER_INTERTRACKSLOADING 0                   # Load 0.25,0.50 and 0.75 tracks positions
 
 # ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : floppy_utils.c
 // Contains: utils functions
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -182,23 +182,43 @@ HXCFE_CYLINDER* allocCylinderEntry(int32_t rpm,int32_t number_of_side)
 
 	if(number_of_side>0)
 	{
-		cyl=(HXCFE_CYLINDER*)malloc(sizeof(HXCFE_CYLINDER));
-		cyl->floppyRPM=rpm;
-		cyl->number_of_side=number_of_side;
+		cyl = (HXCFE_CYLINDER*) malloc(sizeof(HXCFE_CYLINDER));
+		if(!cyl)
+			goto error;
+
+		memset(cyl,0,sizeof(HXCFE_CYLINDER));
+
+		cyl->floppyRPM = rpm;
+		cyl->number_of_side = number_of_side;
 
 		if( number_of_side <= 2 )
 		{
 			cyl->sides = (HXCFE_SIDE**)malloc( sizeof(HXCFE_SIDE*) * 2 );
+			if(!cyl->sides)
+				goto error;
+
 			memset( cyl->sides, 0, sizeof(HXCFE_SIDE*) * 2 );
 		}
 		else
 		{
 			cyl->sides = (HXCFE_SIDE**)malloc( sizeof(HXCFE_SIDE*) * number_of_side );
+			if(!cyl->sides)
+				goto error;
+
 			memset( cyl->sides, 0, sizeof(HXCFE_SIDE*) * number_of_side );
 		}
 	}
 
 	return cyl;
+
+error:
+	if( cyl )
+	{
+		free(cyl->sides);
+
+		free(cyl);
+	}
+	return NULL;
 }
 
 void savebuffer(char * name,unsigned char * buffer, int size)

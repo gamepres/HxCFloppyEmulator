@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -202,7 +202,7 @@ FILE *hxc_fopen (const char *filename, const char *mode)
 			}
 		}
 
-		fd = hxc_open (filename, rwflags|oflags, 0666);
+		fd = hxc_open (filename, rwflags|oflags, (unsigned int)0666);
 		if(fd==-1)
 			return NULL;
 
@@ -429,7 +429,6 @@ alloc_error:
 				memset(&fileStat,0,sizeof(struct stat));
 				if(!lstat (tmpstr, &fileStat))
 				{
-
 					if ( S_ISDIR ( fileStat.st_mode ) )
 						fileinfo->isdirectory=1;
 					else
@@ -440,23 +439,16 @@ alloc_error:
 					strncpy(fileinfo->filename,d->d_name,256);
 
 					free(tmpstr);
+
 					return (void*)dir;
 				}
 
 				free(tmpstr);
 			}
-
-			closedir (dir);
-			dir=0;
-
 		}
 
 		closedir (dir);
-		dir=0;;
-	}
-	else
-	{
-		dir=0;
+		dir = 0;
 	}
 
 	return (void*)dir;
