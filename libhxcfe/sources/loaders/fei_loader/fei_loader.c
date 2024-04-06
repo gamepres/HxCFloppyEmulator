@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : fei_loader.c
 // Contains: FEI floppy image loader
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -122,8 +122,6 @@ int FEI_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 		floppydisk->floppySectorPerTrack,
 		floppydisk->floppyiftype);
 
-
-
 	floppydisk->tracks=(HXCFE_CYLINDER**)malloc(sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
 	if(tracksize && floppydisk->tracks)
 	{
@@ -131,7 +129,6 @@ int FEI_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 
 		for(i=0;i<floppydisk->floppyNumberOfTrack;i++)
 		{
-
 			for(j=0;j<floppydisk->floppyNumberOfSide;j++)
 			{
 
@@ -139,12 +136,16 @@ int FEI_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 
 				if(!floppydisk->tracks[i])
 				{
-					floppydisk->tracks[i]=allocCylinderEntry(rpm,floppydisk->floppyNumberOfSide);
-					currentcylinder = floppydisk->tracks[i];
+					floppydisk->tracks[i] = allocCylinderEntry(rpm,floppydisk->floppyNumberOfSide);
+					if(!floppydisk->tracks[i])
+						goto error;
 				}
 
-				currentcylinder->sides[j]=tg_alloctrack(floppydisk->floppyBitRate,UNKNOWN_ENCODING,currentcylinder->floppyRPM,tracksize*8,2500,-2500,0x00);
-				currentside=currentcylinder->sides[j];
+				currentcylinder = floppydisk->tracks[i];
+
+				currentcylinder->sides[j] = tg_alloctrack(floppydisk->floppyBitRate,UNKNOWN_ENCODING,currentcylinder->floppyRPM,tracksize*8,2500,-2500,0x00);
+
+				currentside = currentcylinder->sides[j];
 				currentside->number_of_sector=floppydisk->floppySectorPerTrack;
 
 				fseek(f,(tracksize*i)+(tracksize*floppydisk->floppyNumberOfTrack*j),SEEK_SET);
@@ -159,7 +160,7 @@ int FEI_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 
 				for(k=0;k<tracksize;k++)
 				{
-					currentside->databuffer[k]=LUT_ByteBitsInverter[currentside->databuffer[k]];
+					currentside->databuffer[k] = LUT_ByteBitsInverter[currentside->databuffer[k]];
 				}
 			}
 		}
@@ -169,22 +170,28 @@ int FEI_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 	}
 
 	hxc_fclose(f);
+
 	return HXCFE_BADFILE;
+
+error:
+
+	hxc_fclose(f);
+
+	return HXCFE_INTERNALERROR;
 }
 
 int FEI_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="FEI";
 	static const char plug_desc[]="FEI Loader";
 	static const char plug_ext[]="fei";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	FEI_libIsValidDiskFile,
-		(LOADDISKFILE)		FEI_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	FEI_libGetPluginInfo
+		(ISVALIDDISKFILE)   FEI_libIsValidDiskFile,
+		(LOADDISKFILE)      FEI_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    FEI_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(
@@ -197,4 +204,3 @@ int FEI_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * retu
 			plug_ext
 			);
 }
-

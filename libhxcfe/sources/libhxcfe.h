@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -216,6 +216,8 @@ int32_t                hxcfe_floppyUnload( HXCFE* floppycontext, HXCFE_FLOPPY * 
 HXCFE_FLOPPY *         hxcfe_floppyDuplicate( HXCFE* floppycontext, HXCFE_FLOPPY * floppydisk );
 int32_t                hxcfe_floppySectorBySectorCopy( HXCFE* floppycontext, HXCFE_FLOPPY * dest_floppy, HXCFE_FLOPPY * src_floppy, int dest_format_ref );
 
+int32_t                hxcfe_freeFloppy( HXCFE* floppycontext, HXCFE_FLOPPY * floppydisk );
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Custom Image/floppy generation functions                                                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -382,7 +384,7 @@ void                   hxcfe_deinitSectorAccess( HXCFE_SECTORACCESS* ss_ctx );
 #define FDC_SECTOR_NOT_FOUND             0x03
 #define FDC_ACCESS_ERROR                 0x04
 
-HXCFE_FDCCTRL *    hxcfe_initFDC ( HXCFE* floppycontext );
+HXCFE_FDCCTRL *        hxcfe_initFDC ( HXCFE* floppycontext );
 
 int32_t                hxcfe_insertDiskFDC (HXCFE_FDCCTRL * fdc, HXCFE_FLOPPY *fp );
 int32_t                hxcfe_readSectorFDC (HXCFE_FDCCTRL * fdc, uint8_t track, uint8_t side, uint8_t sector, int32_t sectorsize, int32_t mode, int32_t nbsector, uint8_t * buffer, int32_t buffer_size, int32_t * fdcstatus );
@@ -462,6 +464,11 @@ int32_t                hxcfe_floppySetInterfaceMode( HXCFE* floppycontext, HXCFE
 
 int32_t                hxcfe_floppyGetDoubleStep( HXCFE* floppycontext, HXCFE_FLOPPY * newfloppy );
 int32_t                hxcfe_floppySetDoubleStep( HXCFE* floppycontext, HXCFE_FLOPPY * newfloppy, int32_t doublestep );
+
+#define                HXCFE_FLOPPY_WRPROTECTED_FLAG (0x1<<0)
+
+uint32_t               hxcfe_floppyGetFlags( HXCFE* floppycontext, HXCFE_FLOPPY * newfloppy );
+int32_t                hxcfe_floppySetFlags( HXCFE* floppycontext, HXCFE_FLOPPY * newfloppy, uint32_t flags );
 
 int32_t                hxcfe_getFloppyInterfaceModeID( HXCFE* floppycontext, char * ifmode );
 

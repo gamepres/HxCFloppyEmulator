@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : xml_disk.c
 // Contains: raw disk loader/creator
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -115,6 +115,8 @@ typedef struct app_data
 
 	int32_t interface_mode;
 	int32_t double_step;
+
+	int32_t write_protect;
 
 	int32_t fill_value;
 
@@ -490,6 +492,9 @@ static void XMLCALL charhandler(void *data, const char *s, int len)
 		case FILESIZE:
 			ad->file_size = atoi(buffer);
 		break;
+		case WRITE_PROTECT:
+			ad->write_protect = atoi(buffer);
+		break;
 /*		case TRACKSIZE:
 			ad->track_size = atoi(buffer);
 		break;*/
@@ -850,8 +855,12 @@ static void XMLCALL end(void *data, const char *el)
 			case LAYOUT:
 				generateDisk(ad,ad->image_data,ad->buffer_size);
 				ad->floppy = hxcfe_getFloppy (ad->fb);
+
 				if(ad->interface_mode>=0)
 					hxcfe_floppySetInterfaceMode(ad->floppycontext,ad->floppy,ad->interface_mode);
+
+				if(ad->write_protect)
+					hxcfe_floppySetFlags(ad->floppycontext, ad->floppy, HXCFE_FLOPPY_WRPROTECTED_FLAG );
 			break;
 
 			case TRACK:
@@ -903,10 +912,14 @@ HXCFE_XMLLDR* hxcfe_initXmlFloppy( HXCFE* floppycontext )
 
 		rfw->xml_parser = XML_ParserCreate(NULL);
 		ad = malloc(sizeof(AppData));
-		if(!ad)
+		if(!ad || !rfw->xml_parser)
 		{
+			free(ad);
+			XML_ParserFree(rfw->xml_parser);
+			free(rfw);
 			return 0;
 		}
+
 		memset(ad,0,sizeof(AppData));
 
 		ad->interface_mode = -1;

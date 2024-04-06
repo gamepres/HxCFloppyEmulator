@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -43,6 +43,7 @@
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
 
+//#define MICRAL 1
 
 #include <string.h>
 #include <stdio.h>
@@ -83,13 +84,14 @@ unsigned char * convert_track(HXCFE_IMGLDR * imgldr_ctx, HXCFE_SIDE * side,unsig
 	unsigned char  * data_track;
 	unsigned int bits_delta,nb_pulses;
 #ifdef MICRAL
-	int oldindexstate;
+	int oldindexstate,index_cnt;
 #endif
 	float adjust_factor;
 
 	track_time = 0;
 #ifdef MICRAL
 	oldindexstate = 0;
+	index_cnt = 0;
 #endif
 
 	tracklen = side->tracklen;
@@ -137,7 +139,6 @@ unsigned char * convert_track(HXCFE_IMGLDR * imgldr_ctx, HXCFE_SIDE * side,unsig
 		final_track_len = (final_track_len & ~0x1F) + 0x20;
 
 	data_track = malloc(tracklen*2);
-
 	if( data_track )
 	{
 		memset(data_track,0,tracklen*2);
@@ -170,9 +171,10 @@ unsigned char * convert_track(HXCFE_IMGLDR * imgldr_ctx, HXCFE_SIDE * side,unsig
 				{
 					if(!oldindexstate && side->indexbuffer[j/8])
 					{
-						printf("devmem 0x%.8X 32 %d\n",0xFF200180,bitpos/4);
+						printf("devmem 0x%.8X 32 %d\n",0xFF200180+(index_cnt*4),bitpos/4);
+						index_cnt++;
 					}
-					
+
 					if(side->indexbuffer[j/8])
 						oldindexstate = 1;
 					else
@@ -261,12 +263,16 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 	unsigned int stream_track_size;
 	unsigned int track_size,number_of_pulses;
 	unsigned char tempbuf[512];
+	unsigned char header_buf[512];
 	unsigned int max_packed_size,track_index;
 	int step;
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"Write Stream HFE file %s.",filename);
 
 	step = 1;
+	stream_track = NULL;
+	packed_track = NULL;
+	tracks_def = NULL;
 
 	if(!floppy->floppyNumberOfTrack)
 	{
@@ -278,7 +284,7 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 
 	if(hxcstreamhfefile)
 	{
-		FILEHEADER=(streamhfe_fileheader *) malloc(512);
+		FILEHEADER=(streamhfe_fileheader *) &header_buf;
 		memset(FILEHEADER,0x00,512);
 		memcpy(&FILEHEADER->signature,"HxC_Stream_Image",16);
 		FILEHEADER->formatrevision = 0;
@@ -303,6 +309,9 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 		tracklistlen=( ((((FILEHEADER->number_of_track * FILEHEADER->number_of_side)+1)*sizeof(streamhfe_track_def))/512) + 1 );
 
 		tracks_def = (streamhfe_track_def *) malloc(tracklistlen*512);
+		if( !tracks_def )
+			goto alloc_error;
+
 		memset(tracks_def,0x00,tracklistlen*512);
 		fwrite(tracks_def,tracklistlen*512,1,hxcstreamhfefile);
 
@@ -340,6 +349,9 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 				{
 					max_packed_size = LZ4_compressBound(stream_track_size);
 					packed_track = malloc(max_packed_size);
+					if( !packed_track )
+						goto alloc_error;
+
 					packedsize = LZ4_compress_default((const char*)stream_track, (char*)packed_track, stream_track_size, max_packed_size);
 
 					//packedsize = stream_track_size;
@@ -348,7 +360,9 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 					fwrite(packed_track,packedsize,1,hxcstreamhfefile);
 
 					free(stream_track);
+					stream_track = NULL;
 					free(packed_track);
+					packed_track = NULL;
 				}
 
 				tracks_def[track_index].packed_data_size = packedsize;
@@ -368,18 +382,31 @@ int STREAMHFE_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,c
 		fseek( hxcstreamhfefile, 0, SEEK_SET );
 		fwrite(FILEHEADER,512,1,hxcstreamhfefile);
 
+		free( stream_track );
+		free( packed_track );
+		free( tracks_def );
+
 		fclose(hxcstreamhfefile);
 
 		imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"%d tracks written to the file",FILEHEADER->number_of_track);
 
-		free(FILEHEADER);
-
-		return 0;
+		return HXCFE_NOERROR;
 	}
 	else
 	{
 		imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"Cannot create %s!",filename);
 
-		return -1;
+		return HXCFE_ACCESSERROR;
 	}
+
+alloc_error:
+
+	if( hxcstreamhfefile )
+		hxc_fclose( hxcstreamhfefile );
+
+	free( stream_track );
+	free( packed_track );
+	free( tracks_def );
+
+	return HXCFE_INTERNALERROR;
 }

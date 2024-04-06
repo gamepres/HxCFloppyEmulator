@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : img_loader.c
 // Contains: IMG floppy image loader
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -248,17 +248,16 @@ int IMG_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 
 int IMG_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="RAW_IMG";
 	static const char plug_desc[]="IBM PC IMG Loader";
 	static const char plug_ext[]="img";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	IMG_libIsValidDiskFile,
-		(LOADDISKFILE)		IMG_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	IMG_libGetPluginInfo
+		(ISVALIDDISKFILE)   IMG_libIsValidDiskFile,
+		(LOADDISKFILE)      IMG_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    IMG_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(
@@ -271,4 +270,3 @@ int IMG_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * retu
 			plug_ext
 			);
 }
-

@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -76,6 +76,8 @@
 
 #define SECONDPASSANALYSIS 1
 
+//#define EXPAND_MATCHING_BLOCK 1
+
 HXCFE* floppycont;
 
 int victor_9k_bands_def[]=
@@ -126,6 +128,9 @@ static int gettrackbit(uint8_t * dstbuffer,int dstsize,int bitoffset)
 void computehistogram(uint32_t *indata,int size,uint32_t *outdata)
 {
 	int i;
+
+	if( !indata || !outdata )
+		return;
 
 	memset(outdata,0,sizeof(uint32_t) * (65536) );
 	for(i=0;i<size;i++)
@@ -530,32 +535,20 @@ HXCFE_SIDE* ScanAndDecodeStream(HXCFE* floppycontext,HXCFE_FXSA * fxs, int initi
 	{
 		// Work buffer allocation.
 
-		outtrack=(unsigned char*)malloc(TEMPBUFSIZE);
-		flakeytrack=(unsigned char*)malloc(TEMPBUFSIZE);
-		indextrack=(unsigned char*)malloc(TEMPBUFSIZE);
-		trackbitrate=(uint32_t*)malloc(TEMPBUFSIZE*sizeof(uint32_t));
+		outtrack = (unsigned char*)calloc(1,TEMPBUFSIZE);
+		flakeytrack = (unsigned char*)calloc(1,TEMPBUFSIZE);
+		indextrack = (unsigned char*)calloc(1,TEMPBUFSIZE);
+		trackbitrate = (uint32_t*)calloc(1,TEMPBUFSIZE*sizeof(uint32_t));
 
 		if( !outtrack || !flakeytrack || !indextrack || !trackbitrate )
 		{
-			if(outtrack)
-				free(outtrack);
+			free(outtrack);
+			free(flakeytrack);
+			free(indextrack);
+			free(trackbitrate);
 
-			if(flakeytrack)
-				free(flakeytrack);
-
-			if(indextrack)
-				free(indextrack);
-
-			if(trackbitrate)
-				free(trackbitrate);
-
-			return 0;
+			return NULL;
 		}
-
-		memset(outtrack,0,TEMPBUFSIZE);
-		memset(flakeytrack,0,TEMPBUFSIZE);
-		memset(indextrack,0,TEMPBUFSIZE);
-		memset(trackbitrate,0,TEMPBUFSIZE*sizeof(uint32_t));
 
 		for(i=0;i<TEMPBUFSIZE;i++)
 		{
@@ -583,10 +576,7 @@ HXCFE_SIDE* ScanAndDecodeStream(HXCFE* floppycontext,HXCFE_FXSA * fxs, int initi
 		}
 
 		if(flags & 1)
-			tickposition=(uint32_t*)malloc(TEMPBUFSIZE*sizeof(uint32_t));
-
-		if(tickposition)
-			memset(tickposition,0,TEMPBUFSIZE*sizeof(uint32_t));
+			tickposition = (uint32_t*)calloc( 1, TEMPBUFSIZE*sizeof(uint32_t));
 
 		bitoffset=0;
 		if(start_index>2000)
@@ -872,7 +862,8 @@ HXCFE_SIDE* ScanAndDecodeStream(HXCFE* floppycontext,HXCFE_FXSA * fxs, int initi
 			tracksize = ( bitoffset >> 3 );
 		}
 
-		if( tracksize >= TEMPBUFSIZE ) tracksize = TEMPBUFSIZE - 1;
+		if( tracksize >= TEMPBUFSIZE )
+			tracksize = TEMPBUFSIZE - 1;
 
 		// Bitrate Filter
 		if(tracksize)
@@ -933,6 +924,10 @@ HXCFE_SIDE* ScanAndDecodeStream(HXCFE* floppycontext,HXCFE_FXSA * fxs, int initi
 					memcpy(hxcfe_track->cell_to_tick,tickposition, tracksize * sizeof(uint32_t));
 				}
 			}
+			else
+			{
+				hxcfe_track->cell_to_tick = NULL;
+			}
 
 			hxcfe_track->tick_freq = fxs->pll.tick_freq;
 
@@ -950,9 +945,7 @@ HXCFE_SIDE* ScanAndDecodeStream(HXCFE* floppycontext,HXCFE_FXSA * fxs, int initi
 			hxcfe_track->bitrate = VARIABLEBITRATE;
 		}
 
-		if(tickposition)
-			free(tickposition);
-
+		free(tickposition);
 		free(trackbitrate);
 		free(indextrack);
 		free(flakeytrack);
@@ -1092,7 +1085,6 @@ static track_blocks * AllocateBlocks(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM * track_du
 					len = len + track_dump->channels[0].stream[j];
 					j++;
 				};
-
 
 				trackb->blocks[i].timeoffset = timeoffset;
 				trackb->blocks[i].tickoffset = tickoffset;
@@ -1431,6 +1423,306 @@ static void compareblock(HXCFE_TRKSTREAM * td,pulsesblock * src_block, uint32_t 
 
 }
 
+#ifdef EXPAND_MATCHING_BLOCK
+
+static int expandblock(HXCFE_TRKSTREAM * td,pulsesblock * src_block, uint32_t dst_block_offset,uint32_t * pulses_ok,uint32_t * pulses_failed,int partial, int max_skew)
+{
+	int marge;
+	int time1,time2;
+	int bad_pulses,good_pulses;
+
+	uint32_t *start_ptr;
+	uint32_t *dst_ptr;
+	uint32_t *last_dump_ptr;
+	uint32_t *last_block_ptr;
+	uint32_t src_number_of_pulses;
+
+	bad_pulses = 0;
+	good_pulses = 0;
+	src_number_of_pulses = src_block->number_of_pulses;
+
+	if( dst_block_offset >= td->channels[0].nb_of_pulses)
+	{
+		if(pulses_ok)
+			*pulses_ok = 0;
+
+		if(pulses_failed)
+			*pulses_failed = 0;
+
+		return 0;
+	}
+
+	if(dst_block_offset + src_number_of_pulses >= td->channels[0].nb_of_pulses)
+	{
+		src_number_of_pulses = td->channels[0].nb_of_pulses - dst_block_offset;
+	}
+
+	src_block->overlap_offset = dst_block_offset;
+
+	start_ptr = &td->channels[0].stream[src_block->start_index];
+	dst_ptr = &td->channels[0].stream[dst_block_offset];
+	last_dump_ptr = &td->channels[0].stream[td->channels[0].nb_of_pulses - 2];
+
+	last_block_ptr = last_dump_ptr;
+
+	if( dst_ptr < last_dump_ptr && start_ptr < last_block_ptr )
+	{
+		time1 = *(start_ptr);
+		time2 = *(dst_ptr);
+
+		marge = ( ( time1 * max_skew ) >> 8 );
+
+		while( (dst_ptr + 8) < last_dump_ptr && (start_ptr+8) < last_block_ptr)
+		{
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+
+		}
+
+		while( (dst_ptr) < last_dump_ptr && (start_ptr) < last_block_ptr)
+		{
+
+			if( time2 > ( time1 + marge ) )
+			{
+				time1 = time1 + *(++start_ptr);
+
+				goto exit_func;
+			}
+			else
+			{
+				if( time2 < ( time1 - marge ) )
+				{
+					time2 = time2 + *(++dst_ptr);
+
+					goto exit_func;
+				}
+				else
+				{
+					time1 = *(++start_ptr);
+					time2 = *(++dst_ptr);
+
+					good_pulses++;
+
+					marge = ( ( time1 * max_skew ) >> 8 );
+				}
+			}
+		}
+	}
+
+	src_block->overlap_size = dst_ptr - &td->channels[0].stream[dst_block_offset];
+
+exit_func:
+	if(pulses_ok)
+		*pulses_ok = good_pulses;
+
+	if(pulses_failed)
+		*pulses_failed = bad_pulses;
+
+	return good_pulses;
+
+}
+#endif
+
 static int fastcompareblock(HXCFE_TRKSTREAM * td,pulsesblock * src_block, uint32_t dst_block_offset, int max_skew)
 {
 	int32_t marge;
@@ -1689,12 +1981,15 @@ static uint32_t compare_block_timebased(HXCFE* floppycontext,HXCFE_TRKSTREAM * t
 
 	time_buffer_len = ((tick_to_time(fxs,total_tick_source)/10) + 1024);
 
-	time_pulse_array_src = malloc( time_buffer_len * sizeof(uint32_t));
-	memset(time_pulse_array_src, 0 , time_buffer_len * sizeof(uint32_t));
+	time_pulse_array_src = calloc( 1, time_buffer_len * sizeof(uint32_t) );
+	time_pulse_array_dst = calloc( 1, time_buffer_len * sizeof(uint32_t) );
 
-	time_pulse_array_dst = malloc( time_buffer_len * sizeof(uint32_t));
-	memset(time_pulse_array_dst, 0 ,time_buffer_len * sizeof(uint32_t));
-
+	if( time_buffer_len && (!time_pulse_array_src || !time_pulse_array_dst))
+	{
+		free(time_pulse_array_src);
+		free(time_pulse_array_dst);
+		return 0;
+	}
 
 	timefactor = (double)total_tick_source / (double)total_tick_destination ;
 
@@ -1762,7 +2057,6 @@ static uint32_t compare_block_timebased(HXCFE* floppycontext,HXCFE_TRKSTREAM * t
 
 	return 0;
 }
-
 
 enum
 {
@@ -2082,15 +2376,11 @@ pulses_link * alloc_pulses_link_array(int numberofpulses)
 
 		if(!pl->backward_link || !pl->forward_link)
 		{
-			if(pl->backward_link)
-				free(pl->backward_link);
-
-			if(pl->forward_link)
-				free(pl->forward_link);
-
+			free(pl->backward_link);
+			free(pl->forward_link);
 			free(pl);
 
-			return 0;
+			return NULL;
 		}
 
 		// -1 Uninitialized
@@ -2111,12 +2401,8 @@ void free_pulses_link_array(pulses_link * pl)
 {
 	if(pl)
 	{
-		if(pl->backward_link)
-			free(pl->backward_link);
-
-		if(pl->forward_link)
-			free(pl->forward_link);
-
+		free(pl->backward_link);
+		free(pl->forward_link);
 		free(pl);
 	}
 }
@@ -2174,7 +2460,7 @@ static pulses_link * ScanAndFindRepeatedBlocks(HXCFE* floppycontext,HXCFE_FXSA *
 
 	end_dump_reached = 0;
 
-	pl = 0;
+	pl = NULL;
 
 	conv_error = NULL;
 	tmp_str = hxcfe_getEnvVar( fxs->hxcfe, "FLUXSTREAM_OVERLAPSEARCHDEPTH", NULL);
@@ -2240,6 +2526,11 @@ static pulses_link * ScanAndFindRepeatedBlocks(HXCFE* floppycontext,HXCFE_FXSA *
 			memset(match_table , 0,sizeof(s_match) * track_dump->channels[0].nb_of_pulses);
 
 			pl = alloc_pulses_link_array(track_dump->channels[0].nb_of_pulses);
+			if(!pl)
+			{
+				free(match_table);
+				return NULL;
+			}
 
 #ifdef FLUXSTREAMDBG
 			floppycontext->hxc_printf(MSG_DEBUG,"Number of pulses : %d",pl->number_of_pulses);
@@ -2402,6 +2693,65 @@ static pulses_link * ScanAndFindRepeatedBlocks(HXCFE* floppycontext,HXCFE_FXSA *
 									tb->blocks[block_num].overlap_size = tb->blocks[block_num].number_of_pulses;
 
 									tb->blocks[block_num].locked = 1;
+
+#ifdef EXPAND_MATCHING_BLOCK
+									// Try to expand this block
+									int tmp_ret;
+									tmp_ret = expandblock(track_dump,&tb->blocks[block_num], tb->blocks[block_num].overlap_offset,&good,&bad,0,fxs->analysis_rev2rev_max_pulses_jitter);
+									if(good && !bad)
+									{
+#ifdef FLUXSTREAMDBG
+										floppycontext->hxc_printf(MSG_DEBUG,"Match block resized from %d pulses to %d pulses",tb->blocks[block_num].overlap_size,tmp_ret);
+#endif
+
+										tb->blocks[block_num].overlap_size = tmp_ret;
+										tb->blocks[block_num].number_of_pulses = tmp_ret;
+
+										int blk_o_i = 0;
+										for( int blk_i = 0; blk_i < tb->number_of_blocks; blk_i++)
+										{
+											if( blk_i != block_num)
+											{
+												if( ( tb->blocks[blk_i].start_index >= tb->blocks[block_num].start_index ) &&
+													( tb->blocks[blk_i].start_index < ( tb->blocks[block_num].start_index + tb->blocks[block_num].overlap_size ) ) )
+												{
+													// starting inside the matching one
+													if(
+														( ( tb->blocks[blk_i].start_index + tb->blocks[blk_i].number_of_pulses ) <=
+														  ( tb->blocks[block_num].start_index + tb->blocks[block_num].number_of_pulses ) )
+														)
+													{
+														// Completly covered - remove it
+													}
+													else
+													{
+														// Partial - reajust start point
+														tb->blocks[blk_i].number_of_pulses -= ( ( tb->blocks[block_num].start_index + tb->blocks[block_num].number_of_pulses ) - tb->blocks[blk_i].start_index);
+														tb->blocks[blk_i].start_index = tb->blocks[block_num].start_index + tb->blocks[block_num].number_of_pulses;
+														if( tb->blocks[blk_i].number_of_pulses > 0)
+														{
+															memcpy(&tb->blocks[blk_o_i++],&tb->blocks[blk_i],sizeof(pulsesblock));
+														}
+													}
+												}
+												else
+												{
+													memcpy(&tb->blocks[blk_o_i++],&tb->blocks[blk_i],sizeof(pulsesblock));
+												}
+											}
+											else
+											{
+												memcpy(&tb->blocks[blk_o_i++],&tb->blocks[blk_i],sizeof(pulsesblock));
+											}
+										}
+
+#ifdef FLUXSTREAMDBG
+										floppycontext->hxc_printf(MSG_DEBUG,"Blocks count updated : %d -> %d",tb->number_of_blocks,blk_o_i);
+#endif
+
+										tb->number_of_blocks = blk_o_i;
+									}
+#endif
 
 									previous_block_matched++;
 								break;
@@ -3057,6 +3407,8 @@ int set_pll_cfg(HXCFE * hxcfe, pll_stat *pll, int * cfg_table, int current_track
 		track_index--;
 
 	histo = (uint32_t*)malloc(65536* sizeof(uint32_t));
+	if(!histo)
+		goto error;
 
 	if(std)
 	{
@@ -3110,6 +3462,10 @@ int set_pll_cfg(HXCFE * hxcfe, pll_stat *pll, int * cfg_table, int current_track
 	free(histo);
 
 	return 1;
+error:
+	free(histo);
+
+	return 0;
 }
 
 HXCFE_FXSA * hxcfe_initFxStream(HXCFE * hxcfe)
@@ -3206,6 +3562,8 @@ HXCFE_FXSA * hxcfe_initFxStream(HXCFE * hxcfe)
 			if(v)
 				fxs->weak_cell_threshold = v;
 
+			fxs->sector_recovery = hxcfe_getEnvVarValue( hxcfe, "FLUXSTREAM_SECTORS_RECOVERY" );
+
 			return fxs;
 		}
 	}
@@ -3254,19 +3612,20 @@ HXCFE_TRKSTREAM * hxcfe_FxStream_ImportStream( HXCFE_FXSA * fxs, void * stream, 
 	unsigned int i,channel;
 
 	if(!fxs)
-		return 0;
+		return NULL;
 
 #ifdef FLUXSTREAMDBG
 	fxs->hxcfe->hxc_printf(MSG_DEBUG,"hxcfe_FxStream_ImportStream : in buffer : %p, wordsize : %d, number of words : %d",stream,wordsize,nbword);
 #endif
 
 	if(!stream)
-		return 0;
+		return NULL;
 
 	if(!trk_stream)
 	{
-		trk_stream = malloc(sizeof(HXCFE_TRKSTREAM));
-		memset( trk_stream, 0, sizeof(HXCFE_TRKSTREAM) );
+		trk_stream = calloc( 1, sizeof(HXCFE_TRKSTREAM));
+		if(!trk_stream)
+			return NULL;
 	}
 
 	trk_stream->tick_freq = fxs->pll.tick_freq;
@@ -3339,9 +3698,8 @@ HXCFE_TRKSTREAM * hxcfe_FxStream_ImportStream( HXCFE_FXSA * fxs, void * stream, 
 		else
 		{
 			free(trk_stream);
-			return 0;
+			return NULL;
 		}
-
 /*
 		if(trk_stream)
 		{
@@ -3351,7 +3709,7 @@ HXCFE_TRKSTREAM * hxcfe_FxStream_ImportStream( HXCFE_FXSA * fxs, void * stream, 
 		return trk_stream;
 	}
 
-	return 0;
+	return NULL;
 }
 
 void hxcfe_FxStream_AddIndex( HXCFE_FXSA * fxs, HXCFE_TRKSTREAM * std, uint32_t streamposition, int32_t tickoffset, uint32_t flags )
@@ -3569,22 +3927,28 @@ HXCFE_FLOPPY * makefloppyfromtrack(HXCFE_SIDE * side)
 {
 	HXCFE_FLOPPY * newfloppy;
 
-	newfloppy=malloc(sizeof(HXCFE_FLOPPY));
+	newfloppy = calloc( 1, sizeof(HXCFE_FLOPPY) );
 	if(newfloppy)
 	{
-		memset(newfloppy,0,sizeof(HXCFE_FLOPPY));
 		newfloppy->floppyBitRate = 250000;
 		newfloppy->floppyNumberOfSide = 1;
 		newfloppy->floppyNumberOfTrack = 1;
 		newfloppy->floppySectorPerTrack = -1;
 
-		newfloppy->tracks=(HXCFE_CYLINDER**)malloc(sizeof(HXCFE_CYLINDER*)*newfloppy->floppyNumberOfTrack);
-		memset(newfloppy->tracks,0,sizeof(HXCFE_CYLINDER*)*newfloppy->floppyNumberOfTrack);
+		newfloppy->tracks=(HXCFE_CYLINDER**)calloc( 1, sizeof(HXCFE_CYLINDER*)*newfloppy->floppyNumberOfTrack );
+		if(!newfloppy->tracks)
+		{
+			free(newfloppy);
+			return NULL;
+		}
 
 		newfloppy->tracks[0] = allocCylinderEntry(0,newfloppy->floppyNumberOfSide);
-
-		newfloppy->tracks[0]->sides=(HXCFE_SIDE**)malloc(sizeof(HXCFE_SIDE*)*newfloppy->floppyNumberOfSide);
-		memset(newfloppy->tracks[0]->sides,0,sizeof(HXCFE_SIDE*)*newfloppy->floppyNumberOfSide);
+		if(!newfloppy->tracks[0])
+		{
+			free(newfloppy->tracks);
+			free(newfloppy);
+			return NULL;
+		}
 
 		newfloppy->tracks[0]->sides[0] = side;
 	}
@@ -3596,11 +3960,10 @@ void freefloppy(HXCFE_FLOPPY * fp)
 {
 	if(fp)
 	{
-		if(fp->tracks[0]->sides)
-		 free(fp->tracks[0]->sides);
-
 		if(fp->tracks)
-		 free(fp->tracks);
+			free(fp->tracks[0]->sides);
+
+		free(fp->tracks);
 
 		free(fp);
 	}
@@ -3767,8 +4130,8 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 	int bitrate;
 	uint32_t totallen,indexperiod;
 	uint32_t * histo;
-	HXCFE_SIDE* currentside;
-	HXCFE_SIDE* revolutionside[MAX_NB_OF_INDEX];
+	HXCFE_SIDE * currentside, * tmp_side;
+	HXCFE_SIDE * revolutionside[MAX_NB_OF_INDEX];
 
 	pulses_link * pl;
 	pulses_link * pl_reversed;
@@ -3799,7 +4162,10 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 #ifdef FLUXSTREAMDBG
 	int patchedbits;
 #endif
-	currentside = 0;
+	currentside = NULL;
+	track_len = 0;
+	rpm = 0;
+	bitrate = 0;
 
 	hxcfe = fxs->hxcfe;
 
@@ -3815,6 +4181,10 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 
 		// Allocate the blocks.
 		tb = AllocateBlocks(fxs, std, fxs->analysis_window_size);
+		if(!tb)
+		{
+			return NULL;
+		}
 
 		hxcfe->hxc_printf(MSG_DEBUG,"Track dump length : %d us, number of block : %d, Number of pulses : %d",totallen/100,tb->number_of_blocks,std->channels[0].nb_of_pulses);
 
@@ -3841,7 +4211,6 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 			hxcfe->hxc_printf(MSG_DEBUG,"...done");
 			if(pl)
 			{
-
 				///////////////////////////////////////////////////////////////////////////
 
 				reversed_std = duplicate_track_stream(std);
@@ -3861,7 +4230,6 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 					{
 						*(backward_link++) = *(forward_link--);
 					}
-
 
 					backward_link = pl->backward_link;
 					forward_link = pl->forward_link;
@@ -3935,7 +4303,6 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 							{
 								track_len += std->channels[0].stream[offset++];
 							}
-
 						}
 						else
 						{
@@ -4096,7 +4463,6 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 					{
 						revolutionside[revolution] = 0;
 					}
-
 				}
 
 				memset(qualitylevel,0,sizeof(qualitylevel));
@@ -4196,6 +4562,111 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 					}
 				}
 
+				// Try here to recover the left bad sectors from others revolutions.
+				if(currentside && bitrate && fxs->sector_recovery)
+				{
+					tmp_side = NULL;
+
+#ifdef FLUXSTREAMDBG
+					fxs->hxcfe->hxc_printf(MSG_DEBUG,"Sectors recovering ... :");
+#endif
+
+					fp = makefloppyfromtrack(currentside);
+
+					i = 0;
+					while( tracktypelist[i] != UNKNOWN_ENCODING )
+					{
+						ss = hxcfe_initSectorAccess(fxs->hxcfe,fp);
+
+						scl = hxcfe_getAllTrackSectors(ss,0,0,tracktypelist[i],&nb_sectorfound);
+
+						if(scl)
+						{
+							if(!tmp_side)
+							{
+								tmp_side = ScanAndDecodeStream(hxcfe,fxs,bitrate,std,NULL,0,rpm,fxs->phasecorrection,0);
+								cleanupTrack(tmp_side);
+							}
+
+							for(sectnum=0;sectnum<nb_sectorfound && tmp_side;sectnum++)
+							{
+								if( scl[sectnum]->use_alternate_data_crc && scl[sectnum]->input_data)
+								{
+									// Bad sector data...
+#ifdef FLUXSTREAMDBG
+									fxs->hxcfe->hxc_printf(MSG_DEBUG,"Bad sector -> head:%d sector:%d sectorsleft:%d cylinder:%d startsectorindex:%d startdataindex:%d endsectorindex:%d\n",scl[sectnum]->head,scl[sectnum]->sector,scl[sectnum]->sectorsleft,scl[sectnum]->cylinder,scl[sectnum]->startsectorindex,scl[sectnum]->startdataindex,scl[sectnum]->endsectorindex);
+#endif
+									if( scl[sectnum]->startsectorindex < scl[sectnum]->endsectorindex )
+									{
+
+										HXCFE_SECTCFG* tmp_scfg;
+
+										HXCFE_FLOPPY * tmp_fp = makefloppyfromtrack(tmp_side);
+										HXCFE_SECTORACCESS* tmp_ss = hxcfe_initSectorAccess( fxs->hxcfe, tmp_fp );
+										if( tmp_ss )
+										{
+											do
+											{
+												tmp_scfg = hxcfe_getNextSector(tmp_ss,0,0,tracktypelist[i]);
+												if( tmp_scfg )
+												{
+													if( (tmp_scfg->sector == scl[sectnum]->sector ) &&
+														(tmp_scfg->head == scl[sectnum]->head ) &&
+														(tmp_scfg->cylinder == scl[sectnum]->cylinder ) &&
+														(tmp_scfg->trackencoding == scl[sectnum]->trackencoding ) &&
+														(tmp_scfg->header_crc == scl[sectnum]->header_crc )
+													)
+													{
+														if( !tmp_scfg->use_alternate_data_crc && tmp_scfg->input_data)
+														{
+#ifdef FLUXSTREAMDBG
+															fxs->hxcfe->hxc_printf(MSG_DEBUG,"Recover sector s%d:c%d:h%d",tmp_scfg->sector,tmp_scfg->cylinder,tmp_scfg->head);
+#endif
+															hxcfe_removeCell( fxs->hxcfe, currentside, scl[sectnum]->startsectorindex,  scl[sectnum]->endsectorindex - scl[sectnum]->startsectorindex );
+															hxcfe_insertCell( fxs->hxcfe, currentside, scl[sectnum]->startsectorindex, 0,  tmp_scfg->endsectorindex - tmp_scfg->startsectorindex );
+
+															for(int k=0;k<tmp_scfg->endsectorindex - tmp_scfg->startsectorindex;k++)
+															{
+																hxcfe_setCellState( fxs->hxcfe, currentside, scl[sectnum]->startsectorindex + k,
+																		hxcfe_getCellState( fxs->hxcfe, tmp_side, tmp_scfg->startsectorindex + k) );
+															}
+
+															hxcfe_freeSectorConfig(tmp_ss, tmp_scfg);
+															tmp_scfg = NULL;
+														}
+													}
+
+													hxcfe_freeSectorConfig(tmp_ss, tmp_scfg);
+												}
+
+											}while( tmp_scfg );
+
+											hxcfe_deinitSectorAccess(tmp_ss);
+										}
+
+										freefloppy(tmp_fp);
+									}
+								}
+
+								hxcfe_freeSectorConfig  (ss,scl[sectnum]);
+							}
+							free(scl);
+						}
+
+						hxcfe_deinitSectorAccess(ss);
+
+						i++;
+					}
+
+					freefloppy(fp);
+
+#ifdef FLUXSTREAMDBG
+					fxs->hxcfe->hxc_printf(MSG_DEBUG,"... Sectors recovering done");
+#endif
+					hxcfe_freeSide(fxs->hxcfe,tmp_side);
+
+				}
+
 				if( currentside )
 					hxcfe_shiftTrackData( fxs->hxcfe, currentside, us2index(0,currentside,(uint32_t)((std->index_evt_tab[hxcfe_FxStream_GetRevolutionIndex( fxs, std, revolution )].tick_offset)*(double)((double)1000000/(double)fxs->pll.tick_freq))& (~0x00000007),0,0) );
 
@@ -4214,7 +4685,6 @@ HXCFE_SIDE * hxcfe_FxStream_AnalyzeAndGetTrack(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM 
 
 		free(tb->blocks);
 		free(tb);
-
 
 		/*j=currentside->tracklen/8;
 		if(currentside->tracklen&7) j++;
@@ -4285,10 +4755,7 @@ void hxcfe_FxStream_FreeStream(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM * stream)
 	{
 		if(stream)
 		{
-			if(stream->channels[0].stream)
-			{
-				free(stream->channels[0].stream);
-			}
+			free(stream->channels[0].stream);
 
 			free(stream);
 		}
@@ -4297,10 +4764,7 @@ void hxcfe_FxStream_FreeStream(HXCFE_FXSA * fxs,HXCFE_TRKSTREAM * stream)
 
 void hxcfe_deinitFxStream(HXCFE_FXSA * fxs)
 {
-	if(fxs)
-	{
-		free(fxs);
-	}
+	free(fxs);
 }
 
 #if 0

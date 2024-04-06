@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -341,6 +341,7 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 	int i,j;
 
 	envvar_entry * backup_env;
+	envvar_entry * tmp_env;
 	la_stats la;
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_DEBUG,"logicanalyzer_libLoad_DiskFile");
@@ -355,15 +356,18 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 	{
 		if(!hxc_stat(imgfile,&staterep))
 		{
-			backup_env = duplicate_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
-			if(!backup_env)
-				goto error;
+			tmp_env = initEnv( (envvar_entry *)imgldr_ctx->hxcfe->envvar, NULL );
+			if(!tmp_env)
+				goto alloc_error;
+
+			backup_env = imgldr_ctx->hxcfe->envvar;
+			imgldr_ctx->hxcfe->envvar = tmp_env;
 
 			len = hxc_getpathfolder(imgfile,0,SYS_PATH_TYPE);
 
 			folder = (char*)malloc(len+1);
 			if(!folder)
-				goto error;
+				goto alloc_error;
 
 			hxc_getpathfolder(imgfile,folder,SYS_PATH_TYPE);
 
@@ -378,6 +382,10 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 				{
 					if(!strstr(fname,".logicbin8bits"))
 					{
+						tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+						imgldr_ctx->hxcfe->envvar = backup_env;
+						deinitEnv( tmp_env );
+
 						free(folder);
 						return HXCFE_BADFILE;
 					}
@@ -396,7 +404,7 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 
 			filepath = malloc( strlen(imgfile) + 32 );
 			if(!filepath)
-				goto error;
+				goto alloc_error;
 
 			sprintf(filepath,"%s%s",folder,"config.script");
 			hxcfe_execScriptFile(imgldr_ctx->hxcfe, filepath);
@@ -504,7 +512,7 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 
 				floppydisk->tracks = (HXCFE_CYLINDER**)malloc(sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
 				if(!floppydisk->tracks)
-					goto error;
+					goto alloc_error;
 
 				memset(floppydisk->tracks,0,sizeof(HXCFE_CYLINDER*)*floppydisk->floppyNumberOfTrack);
 
@@ -556,11 +564,9 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 									hxcfe_getEnvVarValue( imgldr_ctx->hxcfe, "LOGICANALYZER_BMPEXPORT" ), \
 									hxcfe_getEnvVarValue( imgldr_ctx->hxcfe, "LOGICANALYZER_SAMPLERATE" ));
 
-						if(la.index_array)
-							free(la.index_array);
+						free(la.index_array);
 
-						if(la.stream)
-							free(la.stream);
+						free(la.stream);
 
 						la.stream = NULL;
 						la.index_array = NULL;
@@ -579,8 +585,9 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 
 				hxcfe_sanityCheck(imgldr_ctx->hxcfe,floppydisk);
 
-				free_env_vars((envvar_entry *)imgldr_ctx->hxcfe->envvar);
+				tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
 				imgldr_ctx->hxcfe->envvar = backup_env;
+				deinitEnv( tmp_env );
 
 				free(la.stream);
 				free(la.index_array);
@@ -589,6 +596,10 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 			}
 			else
 			{
+				tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+				imgldr_ctx->hxcfe->envvar = backup_env;
+				deinitEnv( tmp_env );
+
 				if( la.stream )
 					free(la.stream);
 
@@ -602,12 +613,19 @@ int logicanalyzer_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * flop
 
 	return HXCFE_BADFILE;
 
-error:
+alloc_error:
 	if(folder)
 		free(folder);
 
 	if(filepath)
 		free(filepath);
+
+	if( backup_env )
+	{
+		tmp_env = (envvar_entry *)imgldr_ctx->hxcfe->envvar;
+		imgldr_ctx->hxcfe->envvar = backup_env;
+		deinitEnv( tmp_env );
+	}
 
 	return HXCFE_INTERNALERROR;
 
@@ -621,10 +639,10 @@ int logicanalyzer_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,v
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	logicanalyzer_libIsValidDiskFile,
-		(LOADDISKFILE)		logicanalyzer_libLoad_DiskFile,
-		(WRITEDISKFILE)		NULL,
-		(GETPLUGININFOS)	logicanalyzer_libGetPluginInfo
+		(ISVALIDDISKFILE)   logicanalyzer_libIsValidDiskFile,
+		(LOADDISKFILE)      logicanalyzer_libLoad_DiskFile,
+		(WRITEDISKFILE)     NULL,
+		(GETPLUGININFOS)    logicanalyzer_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

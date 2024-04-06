@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -114,8 +114,9 @@ int get_next_AED6200P_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SECTC
 				tmp_bit_offset = mfmtobin(track->databuffer,NULL,track->tracklen,tmp_buffer,7,bit_offset,0);
 				if(1)
 				{
+					#define SECT_HEADER_SIZE 7
 					CRC16_Init(&CRC16_High,&CRC16_Low,(unsigned char*)crctable,0x1021,0xFFFF);
-					for(k=0;k<7;k++)
+					for(k=0;k<SECT_HEADER_SIZE;k++)
 					{
 						CRC16_Update(&CRC16_High,&CRC16_Low, tmp_buffer[k],(unsigned char*)crctable );
 					}
@@ -131,7 +132,7 @@ int get_next_AED6200P_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SECTC
 					sector->use_alternate_datamark = 0x00;
 					sector->alternate_addressmark = tmp_buffer[0];
 					sector->use_alternate_addressmark = 0xFF;
-					sector->header_crc = ( tmp_buffer[k-2]<<8 ) | tmp_buffer[k-1] ;
+					sector->header_crc = ( tmp_buffer[SECT_HEADER_SIZE-2]<<8 ) | tmp_buffer[SECT_HEADER_SIZE-1] ;
 					sector->use_alternate_header_crc = 0xFF;
 
 					sector->startsectorindex=bit_offset;
@@ -173,7 +174,10 @@ int get_next_AED6200P_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SECTC
 					{
 						bit_offset = chgbitptr(track->tracklen,bit_offset,4 );
 
-						tmp_sector=(unsigned char*)malloc(1+sector_size+2);
+						tmp_sector = (unsigned char*)malloc(1+sector_size+2);
+						if( !tmp_sector )
+							return -1;
+
 						memset(tmp_sector,0,1+sector_size+2);
 
 						sector->startdataindex = bit_offset;
@@ -184,13 +188,14 @@ int get_next_AED6200P_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SECTC
 							sector->alternate_datamark = tmp_sector[0];
 							sector->use_alternate_datamark = 0xFF;
 
+							#define SECT_DATA_SIZE (1+sector_size+2)
 							CRC16_Init(&CRC16_High,&CRC16_Low,(unsigned char*)crctable,0x1021,0xFFFF);
-							for(k=0;k<1+sector_size+2;k++)
+							for(k=0;k<SECT_DATA_SIZE;k++)
 							{
 								CRC16_Update(&CRC16_High,&CRC16_Low, tmp_sector[k],(unsigned char*)crctable );
 							}
 
-							sector->data_crc = ( tmp_sector[k-2]<<8 ) | tmp_sector[k-1] ;
+							sector->data_crc = ( tmp_sector[SECT_DATA_SIZE-2]<<8 ) | tmp_sector[SECT_DATA_SIZE-1] ;
 
 							if(!CRC16_High && !CRC16_Low)
 							{ // crc ok !!!
@@ -202,8 +207,11 @@ int get_next_AED6200P_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SECTC
 								sector->use_alternate_data_crc=0xFF;
 							}
 
-							sector->input_data=(unsigned char*)malloc(sector_size);
-							memcpy(sector->input_data,&tmp_sector[1],sector_size);
+							sector->input_data = (unsigned char*)malloc(sector_size);
+							if( sector->input_data )
+							{
+								memcpy(sector->input_data,&tmp_sector[1],sector_size);
+							}
 							free(tmp_sector);
 
 							// "Empty" sector detection

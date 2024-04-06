@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : atr_loader.c
 // Contains: ATR Atari floppy image loader
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -217,7 +217,7 @@ int ATR_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 
 		memset(sectorconfig,0,sizeof(HXCFE_SECTCFG)*floppydisk->floppySectorPerTrack);
 
-		trackdata=(unsigned char*)malloc(sectorsize*floppydisk->floppySectorPerTrack);
+		trackdata = (unsigned char*)malloc(sectorsize*floppydisk->floppySectorPerTrack);
 		if( !trackdata )
 			goto alloc_error;
 
@@ -278,6 +278,7 @@ int ATR_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,cha
 			}
 		}
 
+		free(trackdata);
 		free(sectorconfig);
 		imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"track file successfully loaded and encoded!");
 
@@ -294,14 +295,11 @@ alloc_error:
 	if ( f )
 		hxc_fclose( f );
 
-	if( floppydisk->tracks )
-		free( floppydisk->tracks );
+	free( floppydisk->tracks );
+	free( trackdata );
+	free( sectorconfig );
 
-	if( trackdata )
-		free( trackdata );
-
-	if( sectorconfig )
-		free( sectorconfig );
+	hxcfe_freeFloppy(imgldr_ctx->hxcfe, floppydisk );
 
 	return HXCFE_INTERNALERROR;
 }
@@ -309,17 +307,16 @@ alloc_error:
 
 int ATR_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="ATARI_ATR";
 	static const char plug_desc[]="Atari ATR Loader";
 	static const char plug_ext[]="atr";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	ATR_libIsValidDiskFile,
-		(LOADDISKFILE)		ATR_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	ATR_libGetPluginInfo
+		(ISVALIDDISKFILE)   ATR_libIsValidDiskFile,
+		(LOADDISKFILE)      ATR_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    ATR_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

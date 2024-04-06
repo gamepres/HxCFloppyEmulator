@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : system24_loader.c
 // Contains: System24 floppy image loader
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -58,9 +58,7 @@
 
 #include "system24_loader.h"
 
-
 #include "libhxcadaptor.h"
-
 
 int System24_libIsValidDiskFile( HXCFE_IMGLDR * imgldr_ctx, HXCFE_IMGLDR_FILEINFOS * imgfile )
 {
@@ -86,7 +84,6 @@ int System24_libIsValidDiskFile( HXCFE_IMGLDR * imgldr_ctx, HXCFE_IMGLDR_FILEINF
 
 int System24_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,char * imgfile,void * parameters)
 {
-
 	FILE * f;
 	unsigned int filesize;
 	unsigned int file_offset;
@@ -169,7 +166,7 @@ int System24_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydis
 			hxcfe_imgCallProgressCallback(imgldr_ctx, (j<<1) + (i&1),floppydisk->floppyNumberOfTrack*2);
 
 			file_offset=( j *  ( tracksize * 2 ) ) +
-				        ( i *  ( tracksize ) );
+						( i *  ( tracksize ) );
 
 			fseek (f , file_offset , SEEK_SET);
 			hxc_fread(trackdata,tracksize,f);
@@ -263,7 +260,6 @@ int System24_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydis
 			}
 
 			currentcylinder->sides[i]=tg_generateTrackEx(floppydisk->floppySectorPerTrack,sectorconfig,1,0,500000,rpm,trackformat,100,2500|NO_SECTOR_UNDER_INDEX,-2500);
-
 		}
 	}
 
@@ -281,6 +277,7 @@ int System24_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydis
 	floppydisk->floppyNumberOfTrack += 4;
 
 	free(trackdata);
+	free(sectorconfig);
 
 	imgldr_ctx->hxcfe->hxc_printf(MSG_INFO_1,"track file successfully loaded and encoded!");
 	hxc_fclose(f);
@@ -291,32 +288,26 @@ alloc_error:
 	if ( f )
 		hxc_fclose( f );
 
-	if( floppydisk->tracks )
-		free( floppydisk->tracks );
-	
-	if( trackdata )
-		free( trackdata );
+	hxcfe_freeFloppy(imgldr_ctx->hxcfe, floppydisk );
 
-	if( sectorconfig )
-		free( sectorconfig );
+	free( trackdata );
+	free( sectorconfig );
 
-	return HXCFE_INTERNALERROR;	
-
+	return HXCFE_INTERNALERROR;
 }
 
 int System24_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="SYSTEM_24";
 	static const char plug_desc[]="System 24 loader";
 	static const char plug_ext[]="s24";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	System24_libIsValidDiskFile,
-		(LOADDISKFILE)		System24_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	System24_libGetPluginInfo
+		(ISVALIDDISKFILE)   System24_libIsValidDiskFile,
+		(LOADDISKFILE)      System24_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    System24_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

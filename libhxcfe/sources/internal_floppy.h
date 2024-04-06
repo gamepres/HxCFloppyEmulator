@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -29,7 +29,7 @@
 #ifndef _INC_INTERNAL_FLOPPY_
 #define _INC_INTERNAL_FLOPPY_
 
-#define VARIABLEBITRATE                    -1
+#define VARIABLEBITRATE                  -1
 #define VARIABLEENCODING                 1
 
 typedef struct _s_index_evt
@@ -51,11 +51,11 @@ typedef struct _s_index_evt
 
 typedef struct _HXCFE_STREAMCHANNEL
 {
-	uint32_t    * stream;
-	uint32_t    nb_of_pulses;
-	uint32_t    flags;
-	uint32_t    type;
-	char        stream_name[64];
+    uint32_t    * stream;
+    uint32_t    nb_of_pulses;
+    uint32_t    flags;
+    uint32_t    type;
+    char        stream_name[64];
 }HXCFE_STREAMCHANNEL;
 
 #define _HXCFE_STREAMCHANNEL_
@@ -64,8 +64,9 @@ typedef struct _HXCFE_TRKSTREAM
 {
     HXCFE_STREAMCHANNEL channels[MAX_NB_OF_STREAMCHANNEL];
     s_index_evt	index_evt_tab[MAX_NB_OF_INDEX];
-    uint32_t	nb_of_index;
-	int         tick_freq;
+    uint32_t    nb_of_index;
+    int         tick_freq;
+    uint32_t    flags;
 }HXCFE_TRKSTREAM;
 
 #define _HXCFE_TRKSTREAM_
@@ -115,6 +116,10 @@ typedef struct _HXCFE_FLOPPY
     int32_t         double_step;
 
     HXCFE_CYLINDER ** tracks;
+
+    // bit 0 : Write protected
+    uint32_t        flags;
+
 }HXCFE_FLOPPY;
 #define _HXCFE_FLOPPY_
 

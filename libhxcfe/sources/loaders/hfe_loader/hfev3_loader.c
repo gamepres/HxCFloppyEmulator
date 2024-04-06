@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -73,7 +73,6 @@ static char * trackencodingcode[]=
 	"EMU_FM_ENCODING",
 	"UNKNOWN_ENCODING"
 };
-
 
 static char * interfacemodecode[]=
 {
@@ -210,6 +209,11 @@ int HFEV3_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,c
 		floppydisk->floppyBitRate=header.bitRate*1000;
 		floppydisk->floppySectorPerTrack=-1;
 		floppydisk->floppyiftype=header.floppyinterfacemode;
+
+		if( !header.write_allowed )
+		{
+			hxcfe_floppySetFlags( imgldr_ctx->hxcfe, floppydisk, HXCFE_FLOPPY_WRPROTECTED_FLAG );
+		}
 
 		imgldr_ctx->hxcfe->hxc_printf(MSG_DEBUG,"HFEv3 : %d track, %d side, %d bit/s, %d sectors, interface mode %s, track encoding:%s",
 			floppydisk->floppyNumberOfTrack,
@@ -474,36 +478,11 @@ int HFEV3_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydisk,c
 alloc_error:
 	imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"HFE File : Internal memory allocation error ! Please report !");
 
-	if(floppydisk->tracks)
-	{
-		for(j=0;j<floppydisk->floppyNumberOfTrack;j++)
-		{
-			if(floppydisk->tracks[j])
-			{
-				if(floppydisk->tracks[j]->sides)
-				{
-					for(i=0;i<floppydisk->floppyNumberOfSide;i++)
-					{
-						hxcfe_freeSide(imgldr_ctx->hxcfe,floppydisk->tracks[j]->sides[i]);
-					}
+	hxcfe_freeFloppy(imgldr_ctx->hxcfe, floppydisk );
 
-					free(floppydisk->tracks[j]->sides);
-				}
-
-				free(floppydisk->tracks[j]);
-			}
-		}
-		free(floppydisk->tracks);
-	}
-
-	if( trackoffsetlist )
-		free(trackoffsetlist);
-
-	if(hfetrack)
-		free(hfetrack);
-
-	if(hfetrack2)
-		free(hfetrack2);
+	free(trackoffsetlist);
+	free(hfetrack);
+	free(hfetrack2);
 
 	return HXCFE_INTERNALERROR;
 }
@@ -512,17 +491,16 @@ int HFEV3_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char 
 
 int HFEV3_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="HXC_HFEV3";
 	static const char plug_desc[]="SD Card HxCFE HFE V3 file Loader";
 	static const char plug_ext[]="hfe";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	HFEV3_libIsValidDiskFile,
-		(LOADDISKFILE)		HFEV3_libLoad_DiskFile,
-		(WRITEDISKFILE)		HFEV3_libWrite_DiskFile,
-		(GETPLUGININFOS)	HFEV3_libGetPluginInfo
+		(ISVALIDDISKFILE)   HFEV3_libIsValidDiskFile,
+		(LOADDISKFILE)      HFEV3_libLoad_DiskFile,
+		(WRITEDISKFILE)     HFEV3_libWrite_DiskFile,
+		(GETPLUGININFOS)    HFEV3_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(
@@ -535,4 +513,3 @@ int HFEV3_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * re
 			plug_ext
 			);
 }
-

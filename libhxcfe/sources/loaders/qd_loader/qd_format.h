@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -39,7 +39,7 @@
 // Contains: HxC Quickdisk floppy image format /
 //           (c) HxC2001 / Jean-François DEL NERO
 //
-// Written by: Jean François DEL NERO
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////

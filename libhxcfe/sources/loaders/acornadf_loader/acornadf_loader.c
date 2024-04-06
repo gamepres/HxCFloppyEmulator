@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -38,7 +38,7 @@
 // File : acornadf_loader.c
 // Contains: Acorn ADF floppy image loader
 //
-// Written by:	DEL NERO Jean Francois
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -120,17 +120,16 @@ int ACORNADF_libLoad_DiskFile(HXCFE_IMGLDR * imgldr_ctx,HXCFE_FLOPPY * floppydis
 
 int ACORNADF_libGetPluginInfo(HXCFE_IMGLDR * imgldr_ctx,uint32_t infotype,void * returnvalue)
 {
-
 	static const char plug_id[]="ACORN_ADF";
 	static const char plug_desc[]="ACORN ADF Loader";
 	static const char plug_ext[]="adf";
 
 	plugins_ptr plug_funcs=
 	{
-		(ISVALIDDISKFILE)	ACORNADF_libIsValidDiskFile,
-		(LOADDISKFILE)		ACORNADF_libLoad_DiskFile,
-		(WRITEDISKFILE)		0,
-		(GETPLUGININFOS)	ACORNADF_libGetPluginInfo
+		(ISVALIDDISKFILE)   ACORNADF_libIsValidDiskFile,
+		(LOADDISKFILE)      ACORNADF_libLoad_DiskFile,
+		(WRITEDISKFILE)     0,
+		(GETPLUGININFOS)    ACORNADF_libGetPluginInfo
 	};
 
 	return libGetPluginInfo(

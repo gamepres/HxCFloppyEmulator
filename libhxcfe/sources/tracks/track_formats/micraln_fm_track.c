@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -125,15 +125,16 @@ int get_next_FM_MicralN_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SEC
 				else
 				{
 					// Search next index
-					while( !track->indexbuffer[ bit_offset / 8 ] )
+					while( (bit_offset < track->tracklen) && !track->indexbuffer[ bit_offset / 8 ] )
 					{
 						bit_offset++;
-						if( bit_offset > track->tracklen )
-						{
-							sector_extractor_sm=ENDOFTRACK;
-							bit_offset = -1;
-							break;
-						}
+					}
+
+					if( bit_offset >= track->tracklen )
+					{
+						sector_extractor_sm = ENDOFTRACK;
+						bit_offset = -1;
+						return bit_offset;
 					}
 				}
 
@@ -159,8 +160,10 @@ int get_next_FM_MicralN_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SEC
 			case LOOKFOR_ADDM:
 
 				tmp_sector_index=(int*)malloc((SECTOR_SIZE) * sizeof(int));
-				if(tmp_sector_index)
-					memset(tmp_sector_index,0,(SECTOR_SIZE) * sizeof(int));
+				if(!tmp_sector_index)
+					goto error;
+
+				memset(tmp_sector_index,0,(SECTOR_SIZE) * sizeof(int));
 
 				tmp_bit_offset = fmtobin(track->databuffer,tmp_sector_index,track->tracklen,tmp_buffer,SECTOR_SIZE,bit_offset + (4 * 8 * 3),0);
 				if( tmp_buffer[0] == SYNC_WORD )
@@ -235,8 +238,7 @@ int get_next_FM_MicralN_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SEC
 					sector_extractor_sm = ENDOFSECTOR;
 				}
 
-				if(tmp_sector_index)
-					free(tmp_sector_index);
+				free(tmp_sector_index);
 
 			break;
 
@@ -252,6 +254,12 @@ int get_next_FM_MicralN_sector(HXCFE* floppycontext,HXCFE_SIDE * track,HXCFE_SEC
 	}while(	(sector_extractor_sm!=ENDOFTRACK) && (sector_extractor_sm!=ENDOFSECTOR));
 
 	return bit_offset;
+
+error:
+	if(tmp_sector_index)
+		free(tmp_sector_index);
+
+	return -1;
 }
 
 void tg_addMicralNSectorToTrack(track_generator *tg,HXCFE_SECTCFG * sectorconfig,HXCFE_SIDE * currentside)
@@ -275,12 +283,12 @@ void tg_addMicralNSectorToTrack(track_generator *tg,HXCFE_SECTCFG * sectorconfig
 		if( sectorconfig->sector == 31 )
 		{
 			us2index( (tg->last_bit_offset + 3500) % currentside->tracklen,currentside,1000,1,0);
-			printf("devmem 0x%.8X 32 %d\n",0xFF200070,(int)((float)((tg->last_bit_offset + 2500) % currentside->tracklen)*(float)6.25));
+			//printf("devmem 0x%.8X 32 %d\n",0xFF200070,(int)((float)((tg->last_bit_offset + 2500) % currentside->tracklen)*(float)6.25));
 
 		}
 
 		us2index( tg->last_bit_offset % currentside->tracklen,currentside,1000,1,0);
-		printf("devmem 0x%.8X 32 %d\n",0xFF200180+(sectorconfig->sector*4),(int)((float)((tg->last_bit_offset + 9100) % currentside->tracklen)*(float)6.25));
+		//printf("devmem 0x%.8X 32 %d\n",0xFF200180+(sectorconfig->sector*4),(int)((float)((tg->last_bit_offset + 9100) % currentside->tracklen)*(float)6.25));
 	}
 
 	for(i=0;i<16;i++)
@@ -292,7 +300,7 @@ void tg_addMicralNSectorToTrack(track_generator *tg,HXCFE_SECTCFG * sectorconfig
 	pushTrackCode(tg,SYNC_WORD,0xFF,currentside,MICRALN_HS_SD);
 
 	// Warning !!!
-	// The machine need these 2 bytes but their exact 
+	// The machine need these 2 bytes but their exact
 	// meaning ("Sector" & "Track") are currently speculative.
 	// The Micral N boot ROM doesn't use them
 	// but expect 2 bytes after the sync word and before the

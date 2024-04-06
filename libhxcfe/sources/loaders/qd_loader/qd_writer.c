@@ -1,6 +1,6 @@
 /*
 //
-// Copyright (C) 2006-2023 Jean-François DEL NERO
+// Copyright (C) 2006-2024 Jean-François DEL NERO
 //
 // This file is part of the HxCFloppyEmulator library
 //
@@ -35,10 +35,10 @@
 //-------------------------------------------------------------------------------//
 //----------------------------------------------------- http://hxc2001.free.fr --//
 ///////////////////////////////////////////////////////////////////////////////////
-// File : qd_loader.c
+// File : qd_writer.c
 // Contains: HxC Quickdisk floppy image writer
 //
-// Written by: Jean François DEL NERO
+// Written by: Jean-François DEL NERO
 //
 // Change History (most recent first):
 ///////////////////////////////////////////////////////////////////////////////////
@@ -207,27 +207,25 @@ int QD_libWrite_DiskFile(HXCFE_IMGLDR* imgldr_ctx,HXCFE_FLOPPY * floppy,char * f
 
 		hxc_fclose(hxcqdfile);
 
-		return 0;
+		return HXCFE_NOERROR;
 	}
 	else
 	{
 		imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"QD_libWrite_DiskFile : Cannot create %s!",filename);
 
-		return -1;
+		return HXCFE_ACCESSERROR;
 	}
 
 error:
 	imgldr_ctx->hxcfe->hxc_printf(MSG_ERROR,"QD_libWrite_DiskFile : Memory allocation error !");
 
-	if(track_blocks)
-		free(track_blocks);
+	free(track_blocks);
 
-	if(mfmtrack)
-		free(mfmtrack);
+	free(mfmtrack);
 
 	if(hxcqdfile)
 		hxc_fclose(hxcqdfile);
 
-	return -1;
+	return HXCFE_INTERNALERROR;
 }
 

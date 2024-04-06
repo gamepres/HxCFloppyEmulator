@@ -8,22 +8,31 @@ TARGET := $(shell uname)
 BASEDIR = ../sources
 INCLUDES = -I$(BASEDIR) -I ../../libhxcfe/sources -I $(BASEDIR)/gui -I $(BASEDIR)/thirdpartylibs/fltk/fltk-1.x.x/ -I ../../libusbhxcfe/sources -I ../../libhxcadaptor/sources -I ../../build -I $(BASEDIR)/gui/microintro/
 
+FLTK1_4 ?= 0
 DEBUG ?= 0
 DEBUG_ASAN ?= 0
+DEBUG_INFOS ?= 0
 
 EXEC = hxcfloppyemulator
 
 ifeq ($(DEBUG), 1)
-	CFLAGS = -O0 $(INCLUDES) -Wall -g -DDEBUG
+	CFLAGS = -O0 $(INCLUDES) -Wall -DDEBUG
 	LDFLAGS =
+	DEBUG_INFOS = 1
 else
 	CFLAGS = -O3 $(INCLUDES) -Wall
-	LDFLAGS = -s
+	LDFLAGS =
 endif
 
 ifeq ($(DEBUG_ASAN), 1)
 	CFLAGS += -fsanitize=address -fno-omit-frame-pointer
 	LDFLAGS += -static-libasan -fsanitize=address
+endif
+
+ifeq ($(DEBUG_INFOS), 1)
+	CFLAGS += -g
+else
+	LDFLAGS += -s
 endif
 
 ifdef IPF_LIB_SUPPORT
@@ -84,9 +93,17 @@ else
 	LDFLAGS += $(shell $(BASEDIR)/thirdpartylibs/fltk/fltk-1.x.x/fltk-config --ldflags)
 endif
 
+ifdef STANDALONEFSBROWSER_BUILD
+	CFLAGS += -DSTANDALONEFSBROWSER
+	EXEC = DosDiskBrowser.exe
+endif
+
 FTDIFLOPPYEMU=usb_hxcfloppyemulator.o variablebitrate.o
 
-GUI = main_gui.o msg_txt.o gui_strings.o about_gui.o batch_converter_window.o floppy_dump_window.o floppy_infos_window.o license_gui.o log.o parameters.o rawfile_loader_window.o sdhxcfecfg_window.o usbhxcfecfg_window.o cb_batch_converter_window.o cb_floppy_dump_window.o cb_floppy_infos_window.o cb_rawfile_loader_window.o cb_sdhxcfecfg_window.o cb_usbhxcfecfg_window.o cb_filesystem_generator_window.o filesystem_generator_window.o cb_edittool_window.o edittool_window.o floppy_streamer_window.o cb_floppy_streamer_window.o
+GUI = main_gui.o msg_txt.o gui_strings.o about_gui.o batch_converter_window.o floppy_dump_window.o floppy_infos_window.o license_gui.o \
+	log.o parameters.o rawfile_loader_window.o sdhxcfecfg_window.o usbhxcfecfg_window.o cb_batch_converter_window.o cb_floppy_dump_window.o \
+	cb_floppy_infos_window.o cb_rawfile_loader_window.o cb_sdhxcfecfg_window.o cb_usbhxcfecfg_window.o cb_filesystem_generator_window.o \
+	filesystem_generator_window.o cb_edittool_window.o edittool_window.o floppy_streamer_window.o cb_floppy_streamer_window.o fl_dnd_box.o
 
 MICROINTRO = microintro.o lzw.o pack.o rle.o hxcmod.o
 FLTKLIB = $(BASEDIR)/thirdpartylibs/fltk/fltk-1.x.x/lib/libfltk.a $(BASEDIR)/thirdpartylibs/fltk/fltk-1.x.x/lib/libfltk_images.a
@@ -97,7 +114,7 @@ all:
 	$(MAKE) $(EXEC)
 
 fltk:
-	cd ../sources/thirdpartylibs/fltk/ && bash ./prepare_fltk.sh
+	cd ../sources/thirdpartylibs/fltk/ && bash ./prepare_fltk.sh $(FLTK1_4)
 ifeq ($(TARGET), mingw32)
 		cd ../sources/thirdpartylibs/fltk/fltk-1.x.x/ && export LDFLAGS='-static-libstdc++ -static-libgcc' && ./configure --host=i686-w64-mingw32 --prefix=/usr/share/mingw-w64
 		$(MAKE) -C ../sources/thirdpartylibs/fltk/fltk-1.x.x/ DIRS=src CC=i686-w64-mingw32-gcc CPP=i686-w64-mingw32-g++
@@ -175,6 +192,10 @@ DATA_FILES: bmptoh
 	cd $(BASEDIR)/gui/microintro/data/ && ../converttools/bmptob8/bmptoh ../../../../COPYING_FULL -DATA
 
 HxCFloppyEmulator.exe: win32_hxcfloppy_res.o main.o utils.o $(GUI) $(MICROINTRO) loader.o soft_cfg_file.o fileselector.o $(FLTKLIB) $(LIBHXCFE) $(LIBUSBHXCFE) ../../build/libhxcadaptor.a
+	$(CPP) -o $@    $^ $(LDFLAGS)
+	cp $@ ../../build
+
+DosDiskBrowser.exe: win32_hxcfloppy_res.o main.o utils.o $(GUI) $(MICROINTRO) loader.o soft_cfg_file.o fileselector.o $(FLTKLIB) $(LIBHXCFE) $(LIBUSBHXCFE) ../../build/libhxcadaptor.a
 	$(CPP) -o $@    $^ $(LDFLAGS)
 	cp $@ ../../build
 
