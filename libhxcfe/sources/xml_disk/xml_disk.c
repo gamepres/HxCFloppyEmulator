@@ -116,6 +116,8 @@ typedef struct app_data
 	int32_t interface_mode;
 	int32_t double_step;
 
+	int32_t write_protect;
+
 	int32_t fill_value;
 
 	int32_t min_nb_of_tracks;
@@ -489,6 +491,9 @@ static void XMLCALL charhandler(void *data, const char *s, int len)
 		break;
 		case FILESIZE:
 			ad->file_size = atoi(buffer);
+		break;
+		case WRITE_PROTECT:
+			ad->write_protect = atoi(buffer);
 		break;
 /*		case TRACKSIZE:
 			ad->track_size = atoi(buffer);
@@ -865,8 +870,12 @@ static void XMLCALL end(void *data, const char *el)
 			case LAYOUT:
 				generateDisk(ad,ad->image_data,ad->buffer_size);
 				ad->floppy = hxcfe_getFloppy (ad->fb);
+
 				if(ad->interface_mode>=0)
 					hxcfe_floppySetInterfaceMode(ad->floppycontext,ad->floppy,ad->interface_mode);
+
+				if(ad->write_protect)
+					hxcfe_floppySetFlags(ad->floppycontext, ad->floppy, HXCFE_FLOPPY_WRPROTECTED_FLAG );
 			break;
 
 			case TRACK:

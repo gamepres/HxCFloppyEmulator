@@ -105,6 +105,18 @@ make
 ./maccreatebundle
 ```
 
+## Workflow / Branch info
+
+The branch **main** is our local main branch with modifications made to fit our own environment and workflow.
+
+The branch **jfdelnero-main** is simply a branch that tracks the main upstream branch at https://github.com/jfdelnero/HxCFloppyEmulator
+
+It should have no commits made from our side (that would not appear on upstream). Its purpose is just to track upstream and make merges easier with our own branches.
+
+Other local feature branches (such as **extended_info_xml_export**) should be based on **main**.
+
+Changes that happen upstream should be brought over to **jfdelnero-main** first and then we can merge back into **main** as needed.
+
 -------------------------------------------------------------------------------
 
 HxC Floppy Emulator project
